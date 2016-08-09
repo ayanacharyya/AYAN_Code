@@ -1,5 +1,5 @@
 import sys
-sys.path.append('/Users/acharyya/Dropbox/MagE_atlas/Tools')
+sys.path.append('../')
 import jrr
 import numpy as np
 import pandas as pd

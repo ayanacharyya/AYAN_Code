@@ -2,11 +2,11 @@
 fit a bunch of emission or absorption lines.
 Started july 2016, Jane Rigby and Ayan Acharyya
 '''
-import mage as m
 import sys
-sys.path.append('/Users/acharyya/Dropbox/MagE_atlas/Tools')
+sys.path.append('../')
+import ayan.mage as m
 import jrr
-import splot_util as s
+import ayan.splot_util as s
 import numpy as np
 import pandas as pd
 pd.set_option('display.max_rows', 50)
