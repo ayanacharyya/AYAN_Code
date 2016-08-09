@@ -1,10 +1,6 @@
 ''' Equivalent width and flux fitter.  Given a spectrum, a continuum, a linelist, and a redshift,
 fit a bunch of emission or absorption lines.
-<<<<<<< HEAD
 Started july 2016, Jane Rigby and Ayan Acharyya
-=======
-Started july 2016, Jane Rigby and Ayan Acharyya.  This is a lot of hard, good work.
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
 '''
 import mage as m
 import sys
@@ -20,11 +16,8 @@ from  astropy.io import ascii
 from matplotlib import pyplot as plt
 mage_mode = "released"
 import argparse as ap
-<<<<<<< HEAD
 from matplotlib.backends.backend_pdf import PdfPages
 
-=======
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
 #-----------Main function starts------------------
 parser = ap.ArgumentParser(description="Mage spectra fitting tool")
 parser.add_argument("--shortlabel")
@@ -35,11 +28,8 @@ parser.add_argument("--only")
 parser.add_argument("--vmax")
 parser.add_argument("--frame")
 parser.add_argument("--nbin")
-<<<<<<< HEAD
 parser.add_argument("--lines")
 parser.add_argument("--fout")
-=======
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
 parser.add_argument('--keepprev', dest='keepprev', action='store_true')
 parser.set_defaults(keepprev=False)
 parser.add_argument('--silent', dest='silent', action='store_true')
@@ -61,50 +51,22 @@ parser.set_defaults(fullmad=False)
 parser.add_argument('--showerr', dest='showerr', action='store_true')
 parser.set_defaults(showerr=False)
 args, leftovers = parser.parse_known_args()
-<<<<<<< HEAD
 if args.dx is not None:
     dx = float(args.dx)
-=======
-if args.fcen is not None:
-    fix_cen = args.fcen
-else:
-    fix_cen = 0
-if args.fcon is not None:
-    fix_con = args.fcon
-else:
-    fix_cont = 1
-if args.dx is not None:
-    dx = args.dx
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
 else:
     dx = 310.
 if args.only is not None:
    display_only_success = args.only
 else:
     display_only_success = 1
-<<<<<<< HEAD
-=======
-if args.vmax is not None:
-    v_maxwidth = args.vmax
-else:
-    v_maxwidth = 300 #in km/s, to set the maximum FWHM that can be fit as a line
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
 if args.frame is not None:
     frame = args.frame
 else:
     frame = None
-<<<<<<< HEAD
-=======
-if args.nbin is not None:
-    nbin = args.nbin
-else:
-    nbin = 5
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
 if args.shortlabel is not None:
     labels = [args.shortlabel]
 else:
     labels = ['rcs0327-E']
-<<<<<<< HEAD
 if args.lines is not None:
     listname = str(args.lines)
 else:
@@ -113,8 +75,6 @@ if args.fout is not None:
     fout = str(args.fout)+'.txt'
 else:
     fout = 'fitted_line_list.txt'
-=======
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
 if args.allspec:
     labels = [
     'rcs0327-B',\
@@ -147,21 +107,14 @@ if args.allspec:
     ]
 if not args.keepprev:
     plt.close('all')
-<<<<<<< HEAD
 
-=======
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
 #-------------------------------------------------------------------------
 (specs) = jrr.mage.getlist_labels(mage_mode, labels)
 (spec_path, line_path) = jrr.mage.getpath(mage_mode)
 line_table = pd.DataFrame(columns=['label', 'line_lab', 'obs_wav', 'rest_wave', 'type','EWr_fit','EWr_fit_u', 'EWr_sum', \
 'EWr_sum_u', 'f_line','f_line_u', \
 #'wt_mn_flux', 'onesig_err_wt_mn_flux', \
-<<<<<<< HEAD
 'med_bin_flux', 'mad_bin_flux', 'MAD_significance', 'EW_3sig_lim_Schneider', 'fit_cont','fit_fl','fit_cen', 'fit_cen_u', \
-=======
-'med_bin_flux', 'mad_bin_flux', 'significance', 'EW_3sig_lim_Schneider', 'fit_cont','fit_fl','fit_cen', 'fit_cen_u', \
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
 'fit_sig','zz','zz_u'])
 
 for ii in range(0, len(specs)) :                  #nfnu_stack[ii] will be ii spectrum
@@ -181,19 +134,11 @@ for ii in range(0, len(specs)) :                  #nfnu_stack[ii] will be ii spe
     m.fit_autocont(sp_orig, zz_sys, line_path,filename)
     sp_orig = sp_orig[~sp_orig['badmask']]
     if args.fullmad:
-<<<<<<< HEAD
         m.calc_mad(sp_orig, resoln, 5)
         continue
     m.calc_schneider_EW(sp_orig, resoln, plotit=args.showerr) # calculating the EW limits at every point following Schneider et al. 1993
     #makelist(linelist)
     line_full = m.getlist('labframe.shortlinelist_'+listname, zz_dic, zz_err_dic)
-=======
-        sp_orig = m.calc_mad(sp_orig, resoln, 5)
-        continue
-    sp_orig = m.calc_schneider_EW(sp_orig, resoln, plotit=args.showerr) # calculating the EW limits at every point following Schneider et al. 1993
-    #makelist(linelist)
-    line_full = m.getlist(zz_dic, zz_err_dic)
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
     #------------Preparing to plot----------------------------------------
     xstart = max(np.min(line_full.wave) - 50.,np.min(sp_orig.wave))
     xlast = min(np.max(line_full.wave) + 50.,np.max(sp_orig.wave))
@@ -201,11 +146,7 @@ for ii in range(0, len(specs)) :                  #nfnu_stack[ii] will be ii spe
         n_arr = np.arange(int(np.ceil((xlast-xstart)/dx))).tolist()
     else:
         n_arr = [int(frame)] #Use this to display a single frame
-<<<<<<< HEAD
     name = '/Users/acharyya/Desktop/mage_plot/'+shortlabel+'-'+listname+'_fit'
-=======
-    name = '/Users/acharyya/Desktop/mage_plot/'+shortlabel+'_CNOSi_emission_fit'
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
     if args.savepdf:
         pdf = PdfPages(name+'.pdf')
     #---------pre check in which frames lines are available if display_only_success = 1---------
@@ -246,11 +187,7 @@ for ii in range(0, len(specs)) :                  #nfnu_stack[ii] will be ii spe
         plt.xlim(xmin, xmax)
         plt.text(xmin+dx*0.05, ax1.get_ylim()[1]*0.8, 'Frame '+str(int(jj)))
         if not args.fullmad:
-<<<<<<< HEAD
             m.fit_some_EWs(line, sp, resoln, shortlabel, line_table, dresoln, sp_orig, args=args) #calling line fitter
-=======
-            line_table = m.fit_some_EWs(line, sp, resoln, shortlabel, line_table, dresoln, sp_orig, args=args) #calling line fitter
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
     
         ax2 = ax1.twiny()
         ax2.set_xlim(ax1.get_xlim())       
@@ -279,11 +216,7 @@ line_table.f_line_u = line_table.f_line_u.astype(np.float64)
 #line_table.onesig_err_wt_mn_flux = line_table.onesig_err_wt_mn_flux.astype(np.float64)
 line_table.med_bin_flux = line_table.med_bin_flux.astype(np.float64)
 line_table.mad_bin_flux = line_table.mad_bin_flux.astype(np.float64)
-<<<<<<< HEAD
 line_table.MAD_significance = line_table.MAD_significance.astype(np.float64)
-=======
-line_table.significance = line_table.significance.astype(np.float64)
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
 line_table.EW_3sig_lim_Schneider = line_table.EW_3sig_lim_Schneider.astype(np.float64)
 line_table.fit_cont = line_table.fit_cont.astype(np.float64)
 line_table.fit_fl = line_table.fit_fl.astype(np.float64)
@@ -292,24 +225,14 @@ line_table.fit_cen_u = line_table.fit_cen_u.astype(np.float64)
 line_table.fit_sig = line_table.fit_sig.astype(np.float64)
 line_table.zz = line_table.zz.astype(np.float64)
 line_table.zz_u = line_table.zz_u.astype(np.float64)
-<<<<<<< HEAD
 line_table['EW_significance']=3.*line_table['EWr_fit']/line_table['EW_3sig_lim_Schneider']
-=======
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
 #------------------------------------------------------------
 if not args.hide:
     print line_table
 else:
     line_table['f_SNR']=np.abs(line_table['f_line'])/line_table['f_line_u']
-<<<<<<< HEAD
     print line_table[['line_lab','f_SNR','MAD_significance','EWr_fit','EWr_fit_u','EW_3sig_lim_Schneider','EW_significance']]
 
-=======
-    line_table['EW_significance']=3.*line_table['EWr_fit']/line_table['EW_3sig_lim_Schneider']
-    print line_table[['line_lab','f_SNR','significance','EWr_fit','EWr_fit_u','EW_3sig_lim_Schneider','EW_significance']]
-
-fout = '/Users/acharyya/Dropbox/mage_atlas/Tools/Contrib/fitted_line_list_new.txt'
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
 head = 'This file contains the measurements of lines in the MagE sample. Generated by EW_fitter.py.\n\
 Columns are:\n\
 label: shortlabel of the galaxy/knot\n\
@@ -323,7 +246,6 @@ EWr_sum: eqv width as calculated by summing the flux (A)\n\
 EWr_sum_u: error in above qty. (A)\n\
 f_line: flux i.e. area under Gaussian fit (erg/s/cm^2)\n\
 f_line_u: error in above qty. (erg/s/cm^2)\n\
-<<<<<<< HEAD
 med_bin_flux: median of binned fluxes. Each bin is +/-2 sigma wide. There are 5 bins on either side of a group of line asked \
 to be fit, beyond the +/-5 sigma window. This is to take into account the wiggles in the spectrum\n\
 mad_bin_flux: median absolute deviation of the above binned fluxes\n\
@@ -331,10 +253,6 @@ MAD_significance: (f_line - med_bin_flux)/mad_bin_flux. Probably should NOT be U
 EW_3sig_lim_Schneider: 3sigma upper limit for unresolved OR detection criteria for resolved EWs, as determined using \
 Schneider et al. 1993 prescription\n\
 EW_significance: ratio of EWr_fit to (EW_3sig_lim_Schneider/3). Probably use this for SIGNIFICANCE\n\
-=======
-wt_mn_flux: weighted mean flux at the center of the line (erg/s/cm^2)\n\
-onesig_err_wt_mn_flux: 1 sigma uncertainty in weighted mean flux at the center of the line (erg/s/cm^2)\n\
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
 fit_cont: continuum, as from the fit (continuum normalised fit)\n\
 fit_fl: amplitude, as from the fit (continuum normalised fit)\n\
 fit_cen: center, as from the fit (continuum normalised fit)\n\
@@ -342,11 +260,7 @@ fit_cen_u: error in above qty. (A)\n\
 fit_sig: sigma, as from the fit (A)\n\
 zz: Corrected redshift of this line, from the fitted center\n\
 zz_u: error in above qty.\n\
-<<<<<<< HEAD
 NaN means the code was unable to fit the line.\n\
-=======
-NaN means either the code was unable to fit the line OR the fit was below 3 sigma flux error at that point\n\
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
 '
 np.savetxt(fout, [], header=head, comments='#')
 line_table.to_csv(fout, sep='\t',mode ='a', index=None)
@@ -367,8 +281,4 @@ if args.check:
         print err_sum/n, np.sqrt(es/n)
     else:
         print 'No lines detected.'
-<<<<<<< HEAD
 #------------------------------------------End of main function------------------------------------------------
-=======
-#------------------------------------------End of main function------------------------------------------------
->>>>>>> 01bf9a28cad8aeaf1a0f8811defb45a195d4ccfc
