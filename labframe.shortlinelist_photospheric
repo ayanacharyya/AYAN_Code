@@ -1,0 +1,24 @@
+#New customised linelist mostly for photospheric lines
+#Columns are:
+LineID restwave type source
+
+#NIV1169   1169.06   PHOTOSPHERE   Leitherer
+#NIII1183   1183.03   PHOTOSPHERE   Leitherer
+#NIII1184   1184.54   PHOTOSPHERE   Leitherer
+CIII1247   1247.38   PHOTOSPHERE   Leitherer
+SiIII1294   1294.54   PHOTOSPHERE   Leitherer
+CIII1296   1296.33   PHOTOSPHERE   Leitherer
+SiIII1296   1296.74   PHOTOSPHERE   Leitherer
+SiIII1298   1298.93   PHOTOSPHERE   Leitherer
+CII1323   1323.93   PHOTOSPHERE   Leitherer
+NIII1324   1324.35   PHOTOSPHERE   Leitherer
+OIV1341   1341.64   PHOTOSPHERE   Leitherer
+SiIII1417   1417.24   PHOTOSPHERE   Leitherer
+SV1501   1501.76   PHOTOSPHERE   Leitherer
+CIII1620   1620.4   PHOTOSPHERE   Leitherer
+FeIV1717   1717.8955   PHOTOSPHERE   Leitherer 
+##initially_1717.9,_corrected_to_1717.8955_from NIST
+NIV1718   1718.55   PHOTOSPHERE   Leitherer
+FeIII1954   1954.61   PHOTOSPHERE   Leitherer
+FeIII1958   1958.59   PHOTOSPHERE   Leitherer
+CIII2297   2297.58   PHOTOSPHERE   Leitherer
