@@ -1,6 +1,35 @@
 ''' Equivalent width and flux fitter.  Given a spectrum, a continuum, a linelist, and a redshift,
 fit a bunch of emission or absorption lines.
 Started july 2016, Jane Rigby and Ayan Acharyya
+
+README
+Usage: python EW_fitter.py --<options>
+<options> are:
+--fcen FCEN ; FCEN = 1 if initial guess for gaussian centers are to be fixed, default 0(False)
+--fcon FCON ; FCON = 1 if initial guess for continuum is to be fixed, default 1(True)
+--dx DX ; DX = how many angstroms of wavelength should be plotted in one panel in the final plot, default = 300A
+--only ONLY ; ONLY = 1 if final plot should have only those panels(patches of wavelength axis) where a line was fitted,
+                else 0 to display all frames, default = 1
+--vmax VMAX ; VMAX = in km/s, to set the maximum FWHM that can be fit as a line, default = 300km/s
+--frame FRAME ; FRAME = index of the panel if you want to see specific panels, the panel indices can be found in top 
+                left of each panel in the final plot, default plots all frames
+--nbin NBIN ; NBIN = # of wavelength points to be binned together to calculate median and MAD binned fluxes and errors
+--lines LINES ; LINES = 'emission' OR 'photospheric' depending on which lines you want to be fit, linelists can be 
+                found in files labframe.shortlinelist_emission and labframe.shortlinelist_photospheric, respectively.
+                default = emission
+--fout FOUT ; FOUT = filename you want the output ASCII file to have, default = fitted_line_list.txt
+--keepprev ; boolean option, if present then doesn't kill the previous matplotlib plots
+--silent ; boolean option, if present then doesn't print whole bunch of info on console while running
+--mask ; boolean option, if present then masks the badpixels around skylines, using thefunction flag_skylines in ayan.mage
+--check ; boolean option, if present then prints at the end the root mean square deviation of 1 sigma error between EWs
+        computed via fitting and via summing
+--allspec ; boolean option, if present then run the code over all the spectra files
+--savepdf ; boolean option, if present then save the plots as pdfs
+--hide ; boolean option, if present then do not show plots at the end
+--showbin ; boolean option, if present then show the binning (on either side of line/s used to calculate median and
+            MAD errors) on the resultant plot
+--fullmad ; boolean option, if present then calculate the MAD at every point on spectrum and add a column to dataframe
+--showerr ; boolean option, if present then plots the Schneider precription EWs with errors
 '''
 import sys
 sys.path.append('../')
