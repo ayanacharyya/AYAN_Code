@@ -166,7 +166,7 @@ for ii in range(0, len(specs)) :                  #nfnu_stack[ii] will be ii spe
         m.calc_mad(sp_orig, resoln, 5)
         continue
     m.calc_schneider_EW(sp_orig, resoln, plotit=args.showerr) # calculating the EW limits at every point following Schneider et al. 1993
-    #makelist(linelist)
+    #makelist(linelist) #required if you need to make a new labframe.shortlinelist file
     line_full = m.getlist('labframe.shortlinelist_'+listname, zz_dic, zz_err_dic)
     #------------Preparing to plot----------------------------------------
     xstart = max(np.min(line_full.wave) - 50.,np.min(sp_orig.wave))
