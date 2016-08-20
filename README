@@ -1,0 +1,11 @@
+This folder contains python codes by Ayan Acharyya that call on the routines in ayanacharyya/ayan/ to perform various tasks on the MagE sample.
+
+EW_fitter.py : Automated equivalent width fitter code. Fits gaussian profiles to all the lines in a given linelist 
+                (labframe.shortlinelist_*) for some/all of the MagE spectra and saves the resulting pandas dataframe with all 
+                the line measurements as an ASCII file (fitted_*_line_list.txt). Gives an upper limit for unresolved lines.
+makelineplot.py : Makes plots of various line ratios by using the measurements and filtering information from the fitted linelist
+                created by the previous code. Still in the rudimentary (non-automated) stage.
+labframe.shortlinelist_* : Input list of lines to be fit
+fitted_*_line_list.txt : Output ASCII file containing pandas dataframe with all the fitted line measurements.
+
+(*= emission or photospheric)
