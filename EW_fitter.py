@@ -26,7 +26,8 @@ Usage: python EW_fitter.py --<options>
         computed via fitting and via summing
 --allspec ; boolean option, if present then run the code over all the spectra files
 --savepdf ; boolean option, if present then save the plots as pdfs
---hide ; boolean option, if present then do not show plots at the end
+--noplot ; boolean option, if present then does not create any plot
+--hide ; boolean option, if present then does not show plots at the end
 --showbin ; boolean option, if present then show the binning (on either side of line/s used to calculate median and
             MAD errors) on the resultant plot
 --fullmad ; boolean option, if present then calculate the MAD at every point on spectrum and add a column to dataframe
@@ -74,6 +75,8 @@ parser.add_argument('--savepdf', dest='savepdf', action='store_true')
 parser.set_defaults(savepdf=False)
 parser.add_argument('--hide', dest='hide', action='store_true')
 parser.set_defaults(hide=False)
+parser.add_argument('--noplot', dest='noplot', action='store_true')
+parser.set_defaults(noplot=False)
 parser.add_argument('--showbin', dest='showbin', action='store_true')
 parser.set_defaults(showbin=False)
 parser.add_argument('--fullmad', dest='fullmad', action='store_true')
@@ -181,7 +184,7 @@ for ii in range(0, len(specs)) :                  #nfnu_stack[ii] will be ii spe
         n_arr = np.arange(int(np.ceil((xlast-xstart)/dx))).tolist()
     else:
         n_arr = [int(ar) for ar in frame.split(',')] #Use this to display selected frame/s
-    name = '/Users/acharyya/Desktop/mage_plot/'+shortlabel+'-'+listname+'_fit'
+    name = '/Users/acharyya/Dropbox/MagE_atlas/Contrib/EWs/'+listname+'/'+shortlabel+'-'+listname+'_fit'
     if args.savepdf:
         pdf = PdfPages(name+'.pdf')
     #---------pre check in which frames lines are available if display_only_success = 1---------
@@ -200,7 +203,7 @@ for ii in range(0, len(specs)) :                  #nfnu_stack[ii] will be ii spe
         n_arr = np.ma.compressed(n_arr)
     #------------------------------------------------------------
     n = len(n_arr) #number of frames that would be displayed
-    if not args.hide:
+    if not args.noplot:
         fig = plt.figure(figsize=(18+10/(n+1),(12 if n > 2 else n*3)))
         #fig = plt.figure(figsize=(14+8/(n+1),(9 if n > 2 else n*3)))
         plt.title(shortlabel + "  z=" + str(zz_sys)+'. Vertical lines legend: Blue=initial guess of center,'+\
@@ -208,7 +211,7 @@ for ii in range(0, len(specs)) :                  #nfnu_stack[ii] will be ii spe
     for fc, jj in enumerate(n_arr):
         xmin = xstart + jj*dx
         xmax = min(xmin + dx, xlast)
-        if not args.hide:
+        if not args.noplot:
             ax1 = fig.add_subplot(n,1,fc+1)
         sp = sp_orig[sp_orig['wave'].between(xmin,xmax)]
         try:
@@ -216,7 +219,7 @@ for ii in range(0, len(specs)) :                  #nfnu_stack[ii] will be ii spe
         except IndexError:
             continue
         #------------Plot the results------------
-        if not args.hide:
+        if not args.noplot:
             plt.step(sp.wave, sp.fnu, color='b')
             plt.step(sp.wave, sp.fnu_u, color='gray')
             plt.step(sp.wave, sp.fnu_cont, color='y')
@@ -227,7 +230,7 @@ for ii in range(0, len(specs)) :                  #nfnu_stack[ii] will be ii spe
         if not args.fullmad:
             m.fit_some_EWs(line, sp, resoln, shortlabel, line_table, dresoln, sp_orig, args=args) #calling line fitter
     
-        if not args.hide:
+        if not args.noplot:
             ax2 = ax1.twiny()
             ax2.set_xlim(ax1.get_xlim())       
             ax2.set_xticklabels(np.round(np.divide(ax1.get_xticks(),(1.+zz_sys)),decimals=0))        
