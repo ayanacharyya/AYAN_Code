@@ -24,7 +24,8 @@ Usage: python EW_fitter.py --<options>
             using thefunction flag_skylines in ayan.mage
 --check ; boolean option, if present then prints at the end the root mean square deviation of 1 sigma error between EWs
         computed via fitting and via summing
---allspec ; boolean option, if present then run the code over all the spectra files
+--allspec ; boolean option, if present then run the code over all the individual spectra files
+--allstack ; boolean option, if present then run the code over all the stacked spectra files
 --savepdf ; boolean option, if present then save the plots as pdfs
 --noplot ; boolean option, if present then does not create any plot
 --hide ; boolean option, if present then does not show plots at the end
@@ -71,6 +72,8 @@ parser.add_argument('--check', dest='check', action='store_true')
 parser.set_defaults(check=False)
 parser.add_argument('--allspec', dest='allspec', action='store_true')
 parser.set_defaults(allspec=False)
+parser.add_argument('--allstack', dest='allstack', action='store_true')
+parser.set_defaults(allstack=False)
 parser.add_argument('--savepdf', dest='savepdf', action='store_true')
 parser.set_defaults(savepdf=False)
 parser.add_argument('--hide', dest='hide', action='store_true')
@@ -97,7 +100,7 @@ if args.frame is not None:
 else:
     frame = None
 if args.shortlabel is not None:
-    labels = [args.shortlabel]
+    labels = [item for item in args.shortlabel.split(',')]
 else:
     labels = ['rcs0327-E']
 if args.lines is not None:
@@ -108,6 +111,15 @@ if args.fout is not None:
     fout = str(args.fout)+'.txt'
 else:
     fout = 'fitted_line_list.txt'
+if args.allstack:
+    labels = [
+    'magestack_bystars_standard',\
+    'magestack_bystars_highZ',\
+    'magestack_bystars_lowZ',\
+    'magestack_bystars_midage8to16Myr',\
+    'magestack_bystars_oldgt16Myr',\
+    'magestack_bystars_younglt8Myr',\
+    ]
 if args.allspec:
     labels = [
     'rcs0327-B',\
@@ -142,33 +154,33 @@ if not args.keepprev:
     plt.close('all')
 
 #-------------------------------------------------------------------------
-(specs) = jrr.mage.getlist_labels(mage_mode, labels)
+(specs) = jrr.mage.getlist_labels(mage_mode, labels, optional_file='/Users/acharyya/Desktop/mage_plot/Spectra/spectra-filenames-redshifts.txt')
 (spec_path, line_path) = jrr.mage.getpath(mage_mode)
 line_table = pd.DataFrame(columns=['label', 'line_lab', 'obs_wav', 'rest_wave', 'type','EWr_fit','EWr_fit_u', 'EWr_sum', \
 'EWr_sum_u', 'f_line','f_line_u', \
-#'wt_mn_flux', 'onesig_err_wt_mn_flux', \
-'med_bin_flux', 'mad_bin_flux', 'MAD_significance', 'EWr_3sig_lim_Schneider', 'fl_3sig_lim_Sndr', 'fit_cont','fit_fl','fit_cen', 'fit_cen_u', \
+'EWr_Suplim', 'f_Suplim', 'fit_cont','fit_f','fit_cen', 'fit_cen_u', \
 'fit_sig','zz','zz_u'])
 
-for ii in range(0, len(specs)) :                  #nfnu_stack[ii] will be ii spectrum
+for ii in range(0, len(specs)) :                  
     shortlabel     = specs['short_label'][ii]
     print 'Spectrum', (ii+1), 'of', len(specs),':', shortlabel #Debugging
     filename  = specs['filename'][ii]
     zz_sys = specs['z_syst'][ii] # from the new z_syst column in spectra_filename file
     zz_dic = {'EMISSION':specs['z_neb'][ii], 'FINESTR':specs['z_neb'][ii], 'PHOTOSPHERE': specs['z_stars'][ii] if specs['fl_st'][ii]==0 else specs['z_neb'][ii], 'ISM':specs['z_ISM'][ii], 'WIND':specs['z_ISM'][ii]}
     zz_err_dic = {'EMISSION':specs['sig_neb'][ii] if specs['fl_neb'][ii]==0 else specs['sig_ISM'][ii], 'FINESTR':specs['sig_neb'][ii] if specs['fl_neb'][ii]==0 else specs['sig_ISM'][ii], 'PHOTOSPHERE': specs['sig_st'][ii] if specs['fl_st'][ii]==0 else specs['sig_neb'][ii], 'ISM':specs['sig_ISM'][ii], 'WIND':specs['sig_ISM'][ii]}    
-    if shortlabel != 'stack':
+    if 'stack' not in shortlabel:
         (sp_orig, resoln, dresoln)  = jrr.mage.open_spectrum(filename, zz_sys, mage_mode)
     else:
-        sp_orig = jrr.mage.open_stacked_spectrum(mage_mode, alt_infile=filename)
-        resoln = 2884. # from that of rcs0327
-        dresoln = 81. 
+        sp_orig = jrr.mage.open_stacked_spectrum(mage_mode)#, alt_infile='magestack_byneb_ChisholmstackA_spectrum.txt') # altfile= Put the filename of the stacked spectrum file here
+        resoln = 3e5/200.   # vel resol of 200km/s from file /Users/acharyya/Dropbox/mage_atlas/Contrib/S99/stack-A-sb99-fit.txt
+        dresoln = 40.       # 
     #-----------fitting continuum----------------------------
     m.fit_autocont(sp_orig, zz_sys, line_path,filename)
     #-------masking sky lines-----------------
-    if args.mymask:
-        m.flag_skylines(sp_orig) #modified masking for skylines, as compared to jrr.mage.flag_skylines
-    sp_orig = sp_orig[~sp_orig['badmask']].copy(deep=True)
+    if 'stack' not in shortlabel:
+        if args.mymask:
+            m.flag_skylines(sp_orig) #modified masking for skylines, as compared to jrr.mage.flag_skylines
+        sp_orig = sp_orig[~sp_orig['badmask']].copy(deep=True)
     #-----calculating MAD error over entire spectrum--------
     if args.fullmad:
         m.calc_mad(sp_orig, resoln, 5)
@@ -183,7 +195,7 @@ for ii in range(0, len(specs)) :                  #nfnu_stack[ii] will be ii spe
     if frame is None:
         n_arr = np.arange(int(np.ceil((xlast-xstart)/dx))).tolist()
     else:
-        n_arr = [int(ar) for ar in frame.split(',')] #Use this to display selected frame/s
+        n_arr = [int(ar)-1 for ar in frame.split(',')] #Use this to display selected frame/s
     name = '/Users/acharyya/Dropbox/MagE_atlas/Contrib/EWs/'+listname+'/'+shortlabel+'-'+listname+'_fit'
     if args.savepdf:
         pdf = PdfPages(name+'.pdf')
@@ -222,14 +234,16 @@ for ii in range(0, len(specs)) :                  #nfnu_stack[ii] will be ii spe
         if not args.noplot:
             plt.step(sp.wave, sp.fnu, color='b')
             plt.step(sp.wave, sp.fnu_u, color='gray')
-            plt.step(sp.wave, sp.fnu_cont, color='y')
             plt.plot(sp.wave, sp.fnu_autocont, color='k')
-            plt.ylim(0, 1.2E-28)
+            if 'stack' not in shortlabel:
+                plt.step(sp.wave, sp.fnu_cont, color='y')
+                plt.ylim(0, 1.2E-28)
+            #else:
+                #plt.ylim(0,3)
             plt.xlim(xmin, xmax)
-            plt.text(xmin+dx*0.05, ax1.get_ylim()[1]*0.8, 'Frame '+str(int(jj)))
+            plt.text(xmin+dx*0.05, ax1.get_ylim()[1]*0.8, 'Frame '+str(int(jj)+1))
         if not args.fullmad:
             m.fit_some_EWs(line, sp, resoln, shortlabel, line_table, dresoln, sp_orig, args=args) #calling line fitter
-    
         if not args.noplot:
             ax2 = ax1.twiny()
             ax2.set_xlim(ax1.get_xlim())       
@@ -254,24 +268,19 @@ line_table.EWr_sum = line_table.EWr_sum.astype(np.float64)
 line_table.EWr_sum_u = line_table.EWr_sum_u.astype(np.float64)
 line_table.f_line = line_table.f_line.astype(np.float64)
 line_table.f_line_u = line_table.f_line_u.astype(np.float64)
-#line_table.wt_mn_flux = line_table.wt_mn_flux.astype(np.float64)
-#line_table.onesig_err_wt_mn_flux = line_table.onesig_err_wt_mn_flux.astype(np.float64)
-line_table.med_bin_flux = line_table.med_bin_flux.astype(np.float64)
-line_table.mad_bin_flux = line_table.mad_bin_flux.astype(np.float64)
-line_table.MAD_significance = line_table.MAD_significance.astype(np.float64)
-line_table.EWr_3sig_lim_Schneider = line_table.EWr_3sig_lim_Schneider.astype(np.float64)
-line_table.fl_3sig_lim_Sndr = line_table.fl_3sig_lim_Sndr.astype(np.float64)
+line_table.EWr_Suplim = line_table.EWr_Suplim.astype(np.float64)
+line_table.f_Suplim = line_table.f_Suplim.astype(np.float64)
 line_table.fit_cont = line_table.fit_cont.astype(np.float64)
-line_table.fit_fl = line_table.fit_fl.astype(np.float64)
+line_table.fit_f = line_table.fit_f.astype(np.float64)
 line_table.fit_cen = line_table.fit_cen.astype(np.float64)
 line_table.fit_cen_u = line_table.fit_cen_u.astype(np.float64)
 line_table.fit_sig = line_table.fit_sig.astype(np.float64)
 line_table.zz = line_table.zz.astype(np.float64)
 line_table.zz_u = line_table.zz_u.astype(np.float64)
-line_table['EW_signi']=3.*line_table['EWr_fit']/line_table['EWr_3sig_lim_Schneider']
+line_table['EW_signi']=3.*line_table['EWr_fit']/line_table['EWr_Suplim']
 line_table['EW_signi']=line_table['EW_signi'].map('{:,.3f}'.format)
-line_table['fl_signi']=3.*line_table['f_line']/line_table['fl_3sig_lim_Sndr']
-line_table['fl_signi']=line_table['fl_signi'].map('{:,.3f}'.format)
+line_table['f_signi']=3.*line_table['f_line']/line_table['f_Suplim']
+line_table['f_signi']=line_table['f_signi'].map('{:,.3f}'.format)
 #----------------Saving dataframe to ASCII file--------------------------------------------
 head = 'This file contains the measurements of lines in the MagE sample. Generated by EW_fitter.py.\n\
 Columns are:\n\
@@ -286,23 +295,18 @@ EWr_sum: eqv width as calculated by summing the flux (A)\n\
 EWr_sum_u: error in above qty. (A)\n\
 f_line: flux i.e. area under Gaussian fit (erg/s/cm^2)\n\
 f_line_u: error in above qty. (erg/s/cm^2)\n\
-med_bin_flux: median of binned fluxes. Each bin is +/-2 sigma wide. There are 5 bins on either side of a group of line asked \
-to be fit, beyond the +/-5 sigma window. This is to take into account the wiggles in the spectrum\n\
-mad_bin_flux: median absolute deviation of the above binned fluxes\n\
-MAD_significance: (f_line - med_bin_flux)/mad_bin_flux. Probably should NOT be USED anymore\n\
-EWr_3sig_lim_Schneider: 3sigma upper limit for unresolved OR detection criteria for resolved EWs, as determined using \
+EWr_Suplim: 3sigma upper limit for unresolved OR detection criteria for resolved EWs, as determined using \
 Schneider et al. 1993 prescription\n\
-fl_3sig_lim_Sndr: 3sigma upper limit for unresolved OR detection criteria for resolved FLUXES following above prescription\n\
-EW_signi: ratio of EWr_fit to (EWr_3sig_lim_Schneider/3). Probably use this for SIGNIFICANCE\n\
-fl_signi: ratio of f_line to (fl_3sig_lim_Sndr/3).\n\
-fit_cont: continuum, as from the fit (continuum normalised fit)\n\
-fit_fl: amplitude, as from the fit (continuum normalised fit)\n\
-fit_cen: center, as from the fit (continuum normalised fit)\n\
-fit_cen_u: error in above qty. (A)\n\
-fit_sig: sigma, as from the fit (A)\n\
+EW_signi: ratio of EWr_fit to (EWr_Suplim/3). Probably use this for SIGNIFICANCE\n\
+f_Suplim: 3sigma upper limit for unresolved OR detection criteria for resolved FLUXES following above prescription\n\
+f_signi: ratio of f_line to (f_Suplim/3).\n\
+fit_cont: continuum from the Gaussian fit (observed frame, continuum normalised fit, hence dimensionless)\n\
+fit_f: amplitude (i.e. height of Gaussian above the continuum) from the Gaussian fit (observed frame, continuum normalised fit, hence dimensionless)\n\
+fit_cen: center from the Gaussian fit (observed frame, continuum normalised fit, units=Angstrom)\n\
+fit_cen_u: error in above qty. (units of Angstrom)\n\
+fit_sig: linewidth of the Gaussian fit (observed frame, continuum normalised fit, units=Angstrom)\n\
 zz: Corrected redshift of this line, from the fitted center\n\
 zz_u: error in above qty.\n\
-EW_significance: how many sigma is the fitted EWr_fit as compared to the one calculated by Schneider et al. 1993 prescription\n\
 NaN means the code was unable to fit the line.\n\
 '
 np.savetxt(fout, [], header=head, comments='#')
@@ -310,7 +314,7 @@ line_table.to_csv(fout, sep='\t',mode ='a', index=None)
 print 'Full table saved to', fout
 #----------Displaying part of dataframe if asked to---------------------------
 line_table['f_SNR']=np.abs(line_table['f_line'])/line_table['f_line_u']
-short_table = line_table[['line_lab','EWr_fit','EWr_fit_u','EWr_3sig_lim_Schneider','EW_signi','f_line','f_line_u','f_SNR','fl_3sig_lim_Sndr','fl_signi']]
+short_table = line_table[['line_lab','EWr_fit','EWr_fit_u','EWr_Suplim','EW_signi','f_line','f_line_u','f_SNR','f_Suplim','f_signi']]
 print 'Some columns of the table are:'
 print short_table
 #----------------Sanity check: comparing 2 differently computed EWs------------------
