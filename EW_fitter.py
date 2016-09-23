@@ -25,7 +25,10 @@ Usage: python EW_fitter.py --<options>
 --check ; boolean option, if present then prints at the end the root mean square deviation of 1 sigma error between EWs
         computed via fitting and via summing
 --allspec ; boolean option, if present then run the code over all the individual spectra files
---allstack ; boolean option, if present then run the code over all the stacked spectra files
+--allbyneb ; boolean option, if present then run the code over all the byneb stacked spectra files, automatically
+            knows only to fit the emission line list and suitable fout (output file name)
+--allbystars ; boolean option, if present then run the code over all the bystars stacked spectra files, automatically
+            knows only to fit the photospheric line list and suitable fout (output file name)
 --savepdf ; boolean option, if present then save the plots as pdfs
 --noplot ; boolean option, if present then does not create any plot
 --hide ; boolean option, if present then does not show plots at the end
@@ -51,6 +54,7 @@ import argparse as ap
 from matplotlib.backends.backend_pdf import PdfPages
 
 #-----------Main function starts------------------
+path = '/Users/acharyya/Dropbox/MagE_atlas/Contrib/EWs/' #directory to store the resulting output files
 parser = ap.ArgumentParser(description="Mage spectra fitting tool")
 parser.add_argument("--shortlabel")
 parser.add_argument("--fcen")
@@ -72,8 +76,10 @@ parser.add_argument('--check', dest='check', action='store_true')
 parser.set_defaults(check=False)
 parser.add_argument('--allspec', dest='allspec', action='store_true')
 parser.set_defaults(allspec=False)
-parser.add_argument('--allstack', dest='allstack', action='store_true')
-parser.set_defaults(allstack=False)
+parser.add_argument('--allbyneb', dest='allbyneb', action='store_true')
+parser.set_defaults(allbyneb=False)
+parser.add_argument('--allbystars', dest='allbystars', action='store_true')
+parser.set_defaults(allbystars=False)
 parser.add_argument('--savepdf', dest='savepdf', action='store_true')
 parser.set_defaults(savepdf=False)
 parser.add_argument('--hide', dest='hide', action='store_true')
@@ -111,15 +117,28 @@ if args.fout is not None:
     fout = str(args.fout)+'.txt'
 else:
     fout = 'fitted_line_list.txt'
-if args.allstack:
+if args.allbyneb:
     labels = [
     'magestack_byneb_standard',\
     'magestack_byneb_highZ',\
     'magestack_byneb_lowZ',\
-    'magestack_bystars_midage8to16Myr',\
+    'magestack_byneb_midage8to16Myr',\
     'magestack_byneb_oldgt16Myr',\
     'magestack_byneb_younglt8Myr',\
     ]
+    listname = 'emission'
+    fout = path + 'all_byneb_stack_fitted_emission_linelist.txt'
+if args.allbystars:
+    labels = [
+    'magestack_bystars_standard',\
+    'magestack_bystars_highZ',\
+    'magestack_bystars_lowZ',\
+    'magestack_bystars_midage8to16Myr',\
+    'magestack_bystars_oldgt16Myr',\
+    'magestack_bystars_younglt8Myr',\
+    ]
+    listname = 'photospheric'
+    fout = path + 'all_bystars_stack_fitted_photospheric_linelist.txt'
 if args.allspec:
     labels = [
     'rcs0327-B',\
@@ -171,7 +190,7 @@ for ii in range(0, len(specs)) :
     if 'stack' not in shortlabel:
         (sp_orig, resoln, dresoln)  = jrr.mage.open_spectrum(filename, zz_sys, mage_mode)
     else:
-        sp_orig = jrr.mage.open_stacked_spectrum(mage_mode)#, alt_infile='magestack_byneb_ChisholmstackA_spectrum.txt') # altfile= Put the filename of the stacked spectrum file here
+        sp_orig = jrr.mage.open_stacked_spectrum(mage_mode)#, alt_infile='magestack_byneb_ChisholmstackA_spectrum.txt') # alt_infile= Put the filename of the stacked spectrum file here
         resoln = 3e5/200.   # vel resol of 200km/s from file /Users/acharyya/Dropbox/mage_atlas/Contrib/S99/stack-A-sb99-fit.txt
         dresoln = 40.       # 
     #-----------fitting continuum----------------------------
@@ -196,7 +215,7 @@ for ii in range(0, len(specs)) :
         n_arr = np.arange(int(np.ceil((xlast-xstart)/dx))).tolist()
     else:
         n_arr = [int(ar)-1 for ar in frame.split(',')] #Use this to display selected frame/s
-    name = '/Users/acharyya/Dropbox/MagE_atlas/Contrib/EWs/'+listname+'/'+shortlabel+'-'+listname+'_fit'
+    name = path + listname+'/'+shortlabel+'-'+listname+'_fit'
     if args.savepdf:
         pdf = PdfPages(name+'.pdf')
     #---------pre check in which frames lines are available if display_only_success = 1---------
@@ -299,7 +318,7 @@ Columns are:\n\
  rest_wave:   rest frame wavelength of the line (A)\n\
  type:        is it emission or ism etc.\n\
  EWr_fit:     eqv width as calculated from the Gaussian fit to the line (A)\n\
- EWr__fit_u:  error in above qty. (A)\n\
+ EWr_fit_u:  error in above qty. (A)\n\
  EWr_sum:     eqv width as calculated by summing the flux (A)\n\
  EWr_sum_u:   error in above qty. (A)\n\
  f_line:      flux i.e. area under Gaussian fit (erg/s/cm^2)\n\
@@ -327,11 +346,12 @@ short_table = line_table[['line_lab','EWr_fit','EWr_fit_u','EWr_Suplim','EW_sign
 print 'Some columns of the table are:'
 print short_table
 #-------------For correcting zz_ism------------------
-print 'label', 'median zz_ism', 'median zz_ism_u'
-for ii in range(0, len(specs)) :                  
-    shortlabel = specs['short_label'][ii]
-    short_table = line_table[line_table['label'].eq(shortlabel)]
-    print shortlabel, np.median(short_table['zz']), np.median(short_table['zz_u'])
+if listname is 'ism':
+    print 'label', 'median zz_ism', 'median zz_ism_u'
+    for ii in range(0, len(specs)) :                  
+        shortlabel = specs['short_label'][ii]
+        short_table = line_table[line_table['label'].eq(shortlabel)]
+        print shortlabel, np.median(short_table['zz']), np.median(short_table['zz_u'])
 #----------------Sanity check: comparing 2 differently computed EWs------------------
 if args.check:
     err_sum, es, n = 0., 0., 0
