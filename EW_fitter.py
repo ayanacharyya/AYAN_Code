@@ -310,7 +310,8 @@ EW_signi: = 3*EWr_fit/EWr_Suplim. Probably use this for SIGNIFICANCE\n\
 f_Suplim: 3sigma upper limit for unresolved OR detection criteria for resolved FLUXES following above prescription\n\
 f_signi: = 3*f_line/f_Suplim\n\
 fit_cont: continuum from the Gaussian fit (observed frame, continuum normalised fit, hence dimensionless)\n\
-fit_f: amplitude (i.e. height of Gaussian above the continuum) from the Gaussian fit (observed frame, continuum normalised fit, hence dimensionless)\n\
+fit_f: amplitude (i.e. height of Gaussian above the continuum) from the Gaussian fit \n\
+(observed frame, continuum normalised fit, hence dimensionless)\n\
 fit_cen: center from the Gaussian fit (observed frame, continuum normalised fit, units=Angstrom)\n\
 fit_cen_u: error in above qty. (units of Angstrom)\n\
 fit_sig: linewidth of the Gaussian fit (observed frame, continuum normalised fit, units=Angstrom)\n\
