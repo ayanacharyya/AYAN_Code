@@ -297,26 +297,26 @@ Columns are:\n\
  line_lab:    label of the line the code was asked to fit\n\
  obs_wav:     observed frame wavelength of the line (A)\n\
  rest_wave:   rest frame wavelength of the line (A)\n\
-type: is it emission or ism etc.\n\
-EWr_fit: eqv width as calculated from the Gaussian fit to the line (A)\n\
-EWr__fit_u: error in above qty. (A)\n\
-EWr_sum: eqv width as calculated by summing the flux (A)\n\
-EWr_sum_u: error in above qty. (A)\n\
-f_line: flux i.e. area under Gaussian fit (erg/s/cm^2)\n\
-f_line_u: error in above qty. (erg/s/cm^2)\n\
-EWr_Suplim: 3sigma upper limit for unresolved OR detection criteria for resolved EWs, as determined using \
+ type:        is it emission or ism etc.\n\
+ EWr_fit:     eqv width as calculated from the Gaussian fit to the line (A)\n\
+ EWr__fit_u:  error in above qty. (A)\n\
+ EWr_sum:     eqv width as calculated by summing the flux (A)\n\
+ EWr_sum_u:   error in above qty. (A)\n\
+ f_line:      flux i.e. area under Gaussian fit (erg/s/cm^2)\n\
+ f_line_u:    error in above qty. (erg/s/cm^2)\n\
+ EWr_Suplim:  3sigma upper limit for unresolved OR detection criteria for resolved EWs, as determined using \
 Schneider et al. 1993 prescription\n\
-EW_signi: = 3*EWr_fit/EWr_Suplim. Probably use this for SIGNIFICANCE\n\
-f_Suplim: 3sigma upper limit for unresolved OR detection criteria for resolved FLUXES following above prescription\n\
-f_signi: = 3*f_line/f_Suplim\n\
-fit_cont: continuum from the Gaussian fit (observed frame, continuum normalised fit, hence dimensionless)\n\
-fit_f: amplitude (i.e. height of Gaussian above the continuum) from the Gaussian fit (observed frame, continuum normalised fit, hence dimensionless)\n\
-fit_cen: center from the Gaussian fit (observed frame, continuum normalised fit, units=Angstrom)\n\
-fit_cen_u: error in above qty. (units of Angstrom)\n\
-fit_sig: linewidth of the Gaussian fit (observed frame, continuum normalised fit, units=Angstrom)\n\
-zz: Corrected redshift of this line, from the fitted center\n\
-zz_u: error in above qty.\n\
-NaN means the code was unable to fit the line.\n\
+ EW_signi:    = 3*EWr_fit/EWr_Suplim. Probably use this for SIGNIFICANCE\n\
+ f_Suplim:    3sigma upper limit for unresolved OR detection criteria for resolved FLUXES following above prescription\n\
+ f_signi:     = 3*f_line/f_Suplim\n\
+ fit_cont:    continuum from the Gaussian fit (observed frame, continuum normalised fit, hence dimensionless)\n\
+ fit_f:       amplitude (i.e. height of Gaussian above the continuum) from the Gaussian fit (observed frame, continuum normalised fit, hence dimensionless)\n\
+ fit_cen:     center from the Gaussian fit (observed frame, continuum normalised fit, units=Angstrom)\n\
+ fit_cen_u:   error in above qty. (units of Angstrom)\n\
+ fit_sig:     linewidth of the Gaussian fit (observed frame, continuum normalised fit, units=Angstrom)\n\
+ zz:          Corrected redshift of this line, from the fitted center\n\
+ zz_u:        error in above qty.\n\
+ NaN means the code was unable to fit the line.\n\
 '
 np.savetxt(fout, [], header=head, comments='#')
 line_table.to_csv(fout, sep='\t',mode ='a', index=None)
