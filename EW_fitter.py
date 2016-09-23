@@ -113,26 +113,26 @@ else:
     fout = 'fitted_line_list.txt'
 if args.allstack:
     labels = [
-    'magestack_bystars_standard',\
-    'magestack_bystars_highZ',\
-    'magestack_bystars_lowZ',\
+    'magestack_byneb_standard',\
+    'magestack_byneb_highZ',\
+    'magestack_byneb_lowZ',\
     'magestack_bystars_midage8to16Myr',\
-    'magestack_bystars_oldgt16Myr',\
-    'magestack_bystars_younglt8Myr',\
+    'magestack_byneb_oldgt16Myr',\
+    'magestack_byneb_younglt8Myr',\
     ]
 if args.allspec:
     labels = [
     'rcs0327-B',\
     'rcs0327-E',\
-    #'rcs0327-Ehires',\
-    #'rcs0327-Elores',\
+    'rcs0327-Ehires',\
+    'rcs0327-Elores',\
     'rcs0327-G',\
     'rcs0327-U',\
-    #'rcs0327-BDEFim1',\
-    #'rcs0327-counterarc',\
+    'rcs0327-BDEFim1',\
+    'rcs0327-counterarc',\
     'S0004-0103',\
-    #'S0004-0103alongslit',\
-    #'S0004-0103otherPA',\
+    'S0004-0103alongslit',\
+    'S0004-0103otherPA',\
     'S0033+0242',\
     'S0108+0624',\
     'S0900+2234',\
@@ -140,15 +140,15 @@ if args.allspec:
     'S1050+0017',\
     'Horseshoe',\
     'S1226+2152',\
-    #'S1226+2152hires',\
-    #'S1226+2152lores',\
+    'S1226+2152hires',\
+    'S1226+2152lores',\
     'S1429+1202',\
     'S1458-0023',\
     'S1527+0652',\
-    #'S1527+0652-fnt',\
+    'S1527+0652-fnt',\
     'S2111-0114',\
     'Cosmic~Eye',\
-    #'S2243-0935',\
+    'S2243-0935',\
     ]
 if not args.keepprev:
     plt.close('all')
@@ -218,8 +218,10 @@ for ii in range(0, len(specs)) :
     if not args.noplot:
         fig = plt.figure(figsize=(18+10/(n+1),(12 if n > 2 else n*3)))
         #fig = plt.figure(figsize=(14+8/(n+1),(9 if n > 2 else n*3)))
-        plt.title(shortlabel + "  z=" + str(zz_sys)+'. Vertical lines legend: Blue=initial guess of center,'+\
+        plt.title(shortlabel + "  z=" + str(zz_sys)+'.\n Vertical lines legend: Blue=initial guess of center,'+\
         ' Red=fitted center, Green=no detection(< 3sigma), Black=unable to fit gaussian', y=1.02)
+        ymin = max(0,np.min(sp.fnu_u)*0.98) #setting ylimits for plotting, to little lower than minimum value of the error
+        ymax = min(3,np.max(sp.fnu)*1.01) #little higher than maximum flux value
     for fc, jj in enumerate(n_arr):
         xmin = xstart + jj*dx
         xmax = min(xmin + dx, xlast)
@@ -232,15 +234,22 @@ for ii in range(0, len(specs)) :
             continue
         #------------Plot the results------------
         if not args.noplot:
-            plt.step(sp.wave, sp.fnu, color='b')
-            plt.step(sp.wave, sp.fnu_u, color='gray')
-            plt.plot(sp.wave, sp.fnu_autocont, color='k')
-            if 'stack' not in shortlabel:
-                plt.step(sp.wave, sp.fnu_cont, color='y')
-                plt.ylim(0, 1.2E-28)
-            #else:
-                #plt.ylim(0,3)
-            plt.xlim(xmin, xmax)
+            try:
+                plt.step(sp.wave, sp.fnu, color='b')
+                plt.step(sp.wave, sp.fnu_u, color='gray')
+                plt.plot(sp.wave, sp.fnu_autocont, color='k')
+                if 'stack' not in shortlabel:
+                    plt.step(sp.wave, sp.fnu_cont, color='y')
+                    plt.ylim(0, 1.2E-28)
+                else:
+                    try:
+                        plt.ylim(ymin,ymax)
+                    except:
+                        pass
+                plt.xlim(xmin, xmax)
+            except:
+                print 'failed at', shortlabel
+                break
             plt.text(xmin+dx*0.05, ax1.get_ylim()[1]*0.8, 'Frame '+str(int(jj)+1))
         if not args.fullmad:
             m.fit_some_EWs(line, sp, resoln, shortlabel, line_table, dresoln, sp_orig, args=args) #calling line fitter
@@ -297,9 +306,9 @@ f_line: flux i.e. area under Gaussian fit (erg/s/cm^2)\n\
 f_line_u: error in above qty. (erg/s/cm^2)\n\
 EWr_Suplim: 3sigma upper limit for unresolved OR detection criteria for resolved EWs, as determined using \
 Schneider et al. 1993 prescription\n\
-EW_signi: ratio of EWr_fit to (EWr_Suplim/3). Probably use this for SIGNIFICANCE\n\
+EW_signi: = 3*EWr_fit/EWr_Suplim. Probably use this for SIGNIFICANCE\n\
 f_Suplim: 3sigma upper limit for unresolved OR detection criteria for resolved FLUXES following above prescription\n\
-f_signi: ratio of f_line to (f_Suplim/3).\n\
+f_signi: = 3*f_line/f_Suplim\n\
 fit_cont: continuum from the Gaussian fit (observed frame, continuum normalised fit, hence dimensionless)\n\
 fit_f: amplitude (i.e. height of Gaussian above the continuum) from the Gaussian fit (observed frame, continuum normalised fit, hence dimensionless)\n\
 fit_cen: center from the Gaussian fit (observed frame, continuum normalised fit, units=Angstrom)\n\
@@ -317,6 +326,12 @@ line_table['f_SNR']=np.abs(line_table['f_line'])/line_table['f_line_u']
 short_table = line_table[['line_lab','EWr_fit','EWr_fit_u','EWr_Suplim','EW_signi','f_line','f_line_u','f_SNR','f_Suplim','f_signi']]
 print 'Some columns of the table are:'
 print short_table
+#-------------For correcting zz_ism------------------
+print 'label', 'median zz_ism', 'median zz_ism_u'
+for ii in range(0, len(specs)) :                  
+    shortlabel = specs['short_label'][ii]
+    short_table = line_table[line_table['label'].eq(shortlabel)]
+    print shortlabel, np.median(short_table['zz']), np.median(short_table['zz_u'])
 #----------------Sanity check: comparing 2 differently computed EWs------------------
 if args.check:
     err_sum, es, n = 0., 0., 0
