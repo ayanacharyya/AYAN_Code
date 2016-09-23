@@ -109,14 +109,6 @@ if args.shortlabel is not None:
     labels = [item for item in args.shortlabel.split(',')]
 else:
     labels = ['rcs0327-E']
-if args.lines is not None:
-    listname = str(args.lines)
-else:
-    listname = 'emission'
-if args.fout is not None:
-    fout = str(args.fout)+'.txt'
-else:
-    fout = 'fitted_line_list.txt'
 if args.allbyneb:
     labels = [
     'magestack_byneb_standard',\
@@ -139,19 +131,23 @@ if args.allbystars:
     ]
     listname = 'photospheric'
     fout = path + 'all_bystars_stack_fitted_photospheric_linelist.txt'
+if args.lines is not None:
+    listname = str(args.lines)
+elif 'listname' not in locals():
+    listname = 'emission'
 if args.allspec:
     labels = [
-    'rcs0327-B',\
+    #'rcs0327-B',\
     'rcs0327-E',\
-    'rcs0327-Ehires',\
-    'rcs0327-Elores',\
+    #'rcs0327-Ehires',\
+    #'rcs0327-Elores',\
     'rcs0327-G',\
     'rcs0327-U',\
-    'rcs0327-BDEFim1',\
-    'rcs0327-counterarc',\
+    #'rcs0327-BDEFim1',\
+    #'rcs0327-counterarc',\
     'S0004-0103',\
-    'S0004-0103alongslit',\
-    'S0004-0103otherPA',\
+    #'S0004-0103alongslit',\
+    #'S0004-0103otherPA',\
     'S0033+0242',\
     'S0108+0624',\
     'S0900+2234',\
@@ -159,16 +155,21 @@ if args.allspec:
     'S1050+0017',\
     'Horseshoe',\
     'S1226+2152',\
-    'S1226+2152hires',\
-    'S1226+2152lores',\
+    #'S1226+2152hires',\
+    #'S1226+2152lores',\
     'S1429+1202',\
     'S1458-0023',\
     'S1527+0652',\
-    'S1527+0652-fnt',\
+    #'S1527+0652-fnt',\
     'S2111-0114',\
     'Cosmic~Eye',\
     'S2243-0935',\
     ]
+    fout = path + 'allspec_fitted_'+listname+'_linelist.txt'
+if args.fout is not None:
+    fout = str(args.fout)+'.txt'
+elif 'fout' not in locals():
+    fout = 'fitted_line_list.txt'
 if not args.keepprev:
     plt.close('all')
 
@@ -275,13 +276,13 @@ for ii in range(0, len(specs)) :
         if not args.noplot:
             ax2 = ax1.twiny()
             ax2.set_xlim(ax1.get_xlim())       
-            ax2.set_xticklabels(np.round(np.divide(ax1.get_xticks(),(1.+zz_sys)),decimals=0))        
+            ax2.set_xticklabels(np.round(np.divide(ax1.get_xticks(),(1.+zz_sys)),decimals=0))
             labels2 = [item.get_text() for item in ax2.get_xticklabels()]
-            ax2.set_xticks(np.concatenate([ax2.get_xticks(), line.wave*(1.+zz_sys)/(1.+line.zz)]))
+            ax2.set_xticks(np.concatenate([ax2.get_xticks(), line.wave]))
+            ax2.set_xlim(ax1.get_xlim())       
             ax2.set_xticklabels(np.concatenate([labels2,np.array(line.label.values).tolist()]), rotation = 45, ha='left', fontsize='small')
-            fig.subplots_adjust(hspace=0.7, top=0.95, bottom=0.05)
+            fig.subplots_adjust(hspace=0.7, top=0.94, bottom=0.05, left=0.05, right=0.95)
     if not args.hide:
-        #fig.tight_layout()
         plt.show(block=False)
     if args.savepdf:
         pdf.savefig(fig)
