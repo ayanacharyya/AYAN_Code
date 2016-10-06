@@ -191,7 +191,7 @@ for ii in range(0, len(specs)) :
     if 'stack' not in shortlabel:
         (sp_orig, resoln, dresoln)  = jrr.mage.open_spectrum(filename, zz_sys, mage_mode)
     else:
-        sp_orig = jrr.mage.open_stacked_spectrum(mage_mode)#, alt_infile='magestack_byneb_ChisholmstackA_spectrum.txt') # alt_infile= Put the filename of the stacked spectrum file here
+        sp_orig = jrr.mage.open_stacked_spectrum(mage_mode, alt_infile=filename) # alt_infile= Put the filename of the stacked spectrum file here
         resoln = 3e5/200.   # vel resol of 200km/s from file /Users/acharyya/Dropbox/mage_atlas/Contrib/S99/stack-A-sb99-fit.txt
         dresoln = 40.       # 
     #-----------fitting continuum----------------------------
