@@ -18,6 +18,8 @@ Usage: python EW_fitter.py --<options>
                 found in files labframe.shortlinelist_emission and labframe.shortlinelist_photospheric, respectively.
                 default = emission
 --fout FOUT ; FOUT = filename you want the output ASCII file to have, default = fitted_line_list.txt
+--see LABEL ; LABEL = line label you want to check (string) if you want to see only the frame containing a relevant line \
+                    and not the whole spectrum, default = None (shows all lines)
 --keepprev ; boolean option, if present then doesn't kill the previous matplotlib plots
 --silent ; boolean option, if present then doesn't print whole bunch of info on console while running
 --mymask ; boolean option, if present then MODIFIES the masking around skylines (as opposed to jrr.mage.flag_skylines), 
@@ -66,6 +68,7 @@ parser.add_argument("--frame")
 parser.add_argument("--nbin")
 parser.add_argument("--lines")
 parser.add_argument("--fout")
+parser.add_argument("--see")
 parser.add_argument('--keepprev', dest='keepprev', action='store_true')
 parser.set_defaults(keepprev=False)
 parser.add_argument('--silent', dest='silent', action='store_true')
@@ -222,8 +225,8 @@ for ii in range(0, len(specs)) :
     #---------pre check in which frames lines are available if display_only_success = 1---------
     #---------------------------just a visualisation thing-----------------------------------
     if display_only_success:
-        for jj in n_arr:
-            xmin = xstart + jj*dx
+        for jj in range(len(n_arr)):
+            xmin = xstart + n_arr[jj]*dx
             xmax = min(xmin + dx, xlast)
             sp = sp_orig[sp_orig['wave'].between(xmin,xmax)]
             try:
@@ -232,7 +235,12 @@ for ii in range(0, len(specs)) :
                 continue
             if not len(line) > 0 or not line['wave'].between(np.min(sp.wave),np.max(sp.wave)).all():
                 n_arr[jj] = np.ma.masked
+            if args.see is not None and not any(args.see in x for x in line.label.values):
+                n_arr[jj] = np.ma.masked
         n_arr = np.ma.compressed(n_arr)
+        if len(n_arr) < 1:
+            print 'None of the requested frames have any line in them. Try with a different frame number.'
+            continue
     #------------------------------------------------------------
     n = len(n_arr) #number of frames that would be displayed
     if not args.noplot:
@@ -242,6 +250,7 @@ for ii in range(0, len(specs)) :
         ' Red=fitted center, Green=no detection(< 3sigma), Black=unable to fit gaussian', y=1.02)
         ymin = max(0,np.min(sp.fnu_u)*0.98) #setting ylimits for plotting, to little lower than minimum value of the error
         ymax = min(3,np.max(sp.fnu)*1.01) #little higher than maximum flux value
+        ymax = np.max(sp.fnu)*1.01
     for fc, jj in enumerate(n_arr):
         xmin = xstart + jj*dx
         xmax = min(xmin + dx, xlast)
