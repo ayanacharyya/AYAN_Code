@@ -21,7 +21,7 @@ else:
     n=50
 #---------to see if detected-----------
 def detect(table, line):
-    if table[table['line_lab'].eq(line)].EW_signi.values[0] > ewthresh and (table[table['line_lab'].eq(line)].f_line.values[0]/table[table['line_lab'].eq(line)].f_line_u.values[0] > 1.):
+    if table[table['line_lab'].eq(line)].EW_signi.values[0] > ew_thresh and (table[table['line_lab'].eq(line)].f_line.values[0]/table[table['line_lab'].eq(line)].f_line_u.values[0] > fSNR_thresh):
         return True
     else:
         return False
@@ -41,12 +41,12 @@ labels = np.unique(fulltable['label'])
 colors = 'rcmybgrmcybgrmcybg' #color schemes
 #------------------------------------------------
 #lines_num = ['OIII]1660', 'OIII1666']
-#lines_num = ['OIII2320', '[OIII]2331']
+lines_num = ['OIII2320', '[OIII]2331']
 #lines_den = ['OII2470mid']
 
 #lines_num = ['CIII977']
 #lines_num = ['CIII]1906', 'CIII]1908']#, 'CIII2323', 'CII2325b', 'CII2325c', 'CII2325d', 'CII2328']
-#lines_den = ['CIII2323', 'CII2325b', 'CII2325c', 'CII2325d', 'CII2328']
+lines_den = ['CII2323', 'CII2325b', 'CII2325c', 'CII2325d', 'CII2328']
 #lines_den = ['CII1335b', 'CII1335c']
 
 #lines_num = ['SiIII1882', 'SiIII1892']
@@ -66,9 +66,9 @@ h = np.zeros(len(lines)) #array to store line indices, to plot on the x-axis
 g = np.zeros(len(labels)) #array to store galaxy indices, to plot on the x-axis
 ew_thresh = 4.0
 fSNR_thresh = 1.0
-quantity = 'EWr_fit' #'f_line'
+quantity = 'f_line'#'EWr_fit' #
 quantity_u = quantity + '_u'
-#lim = 'f_Suplim'
+lim = 'f_Suplim' #EWr_Suplim' #
 #------------------------------------------------
 
 for ii in range(0,len(labels)):
@@ -77,10 +77,7 @@ for ii in range(0,len(labels)):
     ew = np.arange(len(lines)+2)*np.nan
     ewu = np.arange(len(lines)+2)*np.nan
     #filtering criteria as follows
-    table = fulltable[(~np.isnan(fulltable['f_line'])) & (fulltable['label'].eq(labels[ii]))\
-    & (fulltable['EW_signi'] > ew_thresh)\
-    & (fulltable['f_line']/fulltable['f_line_u'] > fSNR_thresh)\
-    ]
+    table = fulltable[(~np.isnan(fulltable['f_line'])) & (fulltable['label'].eq(labels[ii]))]
     
     
     a, avar, b, bvar, c, cvar, d, dvar, z, zu = 0.,0.,0.,0.,0.,0.,0.,0.,0.,0.
@@ -184,15 +181,16 @@ for ii in range(0,len(labels)):
     #--------------------------------------------------------------
     '''
 
-    t = 'Comparing '+quantity
+    t = 'Comparing_'+quantity
     ylab = '('+'+'.join(lines_num)+')'#'('+'+'.join(lines_num)+')_by_('+'+'.join(lines_den)+')'
     xlab = '('+'+'.join(lines_den)+')'#'obj'
     
     plt.ylabel(ylab)
     plt.xlabel(xlab)
     plt.title(t)
-    #plt.yscale('log')
-    #plt.xscale('log')
+    if 'f' in quantity:
+        plt.yscale('log')
+        plt.xscale('log')
     #plt.pause(0.1)
 
 '''
