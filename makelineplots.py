@@ -66,9 +66,9 @@ h = np.zeros(len(lines)) #array to store line indices, to plot on the x-axis
 g = np.zeros(len(labels)) #array to store galaxy indices, to plot on the x-axis
 ew_thresh = 4.0
 fSNR_thresh = 1.0
-quantity = 'f_line'#'EWr_fit' #
+quantity = 'f_line'#'EWr_fit'#
 quantity_u = quantity + '_u'
-lim = 'f_Suplim' #EWr_Suplim' #
+lim = 'f_Suplim' #EWr_Suplim'#
 #------------------------------------------------
 
 for ii in range(0,len(labels)):
