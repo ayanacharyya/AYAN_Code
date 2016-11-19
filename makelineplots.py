@@ -9,6 +9,9 @@ sys.path.append('../')
 import jrr
 import numpy as np
 import pandas as pd
+pd.set_option('display.max_rows', 50)
+pd.set_option('display.max_columns', 50)
+pd.set_option('display.width', 1000)
 from matplotlib import pyplot as plt
 import argparse as ap
 
@@ -21,6 +24,9 @@ else:
     n=50
 #---------to see if detected-----------
 def detect(table, line):
+    #print table[['label','line_lab']] #
+    #print line #
+    #print table[table['line_lab'].eq(line)] #
     if table[table['line_lab'].eq(line)].EW_signi.values[0] > ew_thresh and (table[table['line_lab'].eq(line)].f_line.values[0]/table[table['line_lab'].eq(line)].f_line_u.values[0] > fSNR_thresh):
         return True
     else:
@@ -31,7 +37,7 @@ input_path = '/Users/acharyya/Dropbox/MagE_atlas/Contrib/EWs/' #where is the dat
 table1 = pd.read_table(input_path+'allspec_fitted_emission_linelist.txt', delim_whitespace=True, comment="#") #input dataframe file
 table2 = pd.read_table(input_path+'all_byneb_stack_fitted_emission_linelist.txt', delim_whitespace=True, comment="#") #input dataframe file
 table3 = pd.read_table(input_path+'allesi_fitted_emission_linelist.txt', delim_whitespace=True, comment="#") #input dataframe file
-frames = [table1, table2, table3]
+frames = [table1, table2, table3] #which dataframes to include
 fulltable = pd.concat(frames)
 lines = pd.read_table('labframe.shortlinelist_emission', delim_whitespace=True, comment="#") #input list of lines fitted
 excludelabel = ['magestack_byneb_highZ', 'magestack_byneb_lowZ', 'magestack_byneb_midage8to16Myr', \
@@ -40,35 +46,37 @@ fulltable = fulltable[~fulltable['label'].isin(excludelabel)] #
 labels = np.unique(fulltable['label'])
 colors = 'rcmybgrmcybgrmcybg' #color schemes
 #------------------------------------------------
-#lines_num = ['OIII]1660', 'OIII1666']
-lines_num = ['OIII2320', '[OIII]2331']
+lines_num = ['OIII]1660','OIII]1666']
+#lines_num = ['[OIII]2320', '[OIII]2331']
 #lines_den = ['OII2470mid']
 
 #lines_num = ['CIII977']
-#lines_num = ['CIII]1906', 'CIII]1908']#, 'CIII2323', 'CII2325b', 'CII2325c', 'CII2325d', 'CII2328']
-lines_den = ['CII2323', 'CII2325b', 'CII2325c', 'CII2325d', 'CII2328']
+#lines_num = ['CIII]1906', 'CIII]1908']
+#lines_den = ['CII2323', 'CII2325b', 'CII2325c', 'CII2325d', 'CII2328']
 #lines_den = ['CII1335b', 'CII1335c']
 
 #lines_num = ['SiIII1882', 'SiIII1892']
 #lines_den = ['SiII2335a', 'SiII2335b']
 #lines_den = ['SiII1533']
 
-#lines_num = ['NIV]1486']
-#lines_den = ['NII1084', 'NII1085']
+#lines_num = ['NIV]1486'] #not there in emission linelist
+#lines_den = ['NII1084', 'NII1085'] #not there in emission linelist
 #lines_den = ['NII]2140']
 
-#lines_den = ['HeII1640']
+lines_den = ['HeII1640']
 #------------------------------------------------
 #for line in lines.LineID.values:
 fig, ax1 = plt.subplots(1,1)
-fig.subplots_adjust(hspace=0.7, top=0.95, bottom=0.1, left=0.1, right=0.8)
+fig.subplots_adjust(hspace=0.7, top=0.95, bottom=0.1, left=0.1, right=0.9)
 h = np.zeros(len(lines)) #array to store line indices, to plot on the x-axis
 g = np.zeros(len(labels)) #array to store galaxy indices, to plot on the x-axis
 ew_thresh = 4.0
 fSNR_thresh = 1.0
-quantity = 'f_line'#'EWr_fit'#
+quantity = 'EWr_fit'#'f_line'#
 quantity_u = quantity + '_u'
-lim = 'f_Suplim' #EWr_Suplim'#
+lim = 'EWr_Suplim'#'f_Suplim' #
+new_tab = pd.DataFrame(columns=['label','line_lab','EWr_fit','EWr_fit_u','EWr_Suplim',\
+                'EW_signi','f_line','f_line_u','f_Suplim','f_signi'])
 #------------------------------------------------
 
 for ii in range(0,len(labels)):
@@ -81,14 +89,17 @@ for ii in range(0,len(labels)):
     
     
     a, avar, b, bvar, c, cvar, d, dvar, z, zu = 0.,0.,0.,0.,0.,0.,0.,0.,0.,0.
-    for line in np.array(lines_num):
+    for line in lines_num:
         try:
             if detect(table,line) :
                 a += table[table['line_lab'].eq(line)][quantity].values[0]
                 avar += table[table['line_lab'].eq(line)][quantity_u].values[0]**2
-            if lim in locals(): c += table[table['line_lab'].eq(line)][lim].values[0]
+                new_tab = new_tab.append(table[table['line_lab'].eq(line)][['label','line_lab','EWr_fit','EWr_fit_u','EWr_Suplim',\
+                'EW_signi','f_line','f_line_u','f_Suplim','f_signi']],ignore_index=True) #
+            c += table[table['line_lab'].eq(line)][lim].values[0]
+            #print 'adding c', labels[ii], table[table['line_lab'].eq(line)][lim].values[0] #
         except:
-            #print 'passing' #
+            #print 'passing at a',labels[ii]  #
             pass
     
     for line in lines_den:
@@ -96,7 +107,8 @@ for ii in range(0,len(labels)):
             if detect(table,line) :
                 b += table[table['line_lab'].eq(line)][quantity].values[0]
                 bvar += table[table['line_lab'].eq(line)][quantity_u].values[0]**2
-            if lim in locals(): d += table[table['line_lab'].eq(line)][lim].values[0]
+            d += table[table['line_lab'].eq(line)][lim].values[0]
+            #print 'adding d', labels[ii], table[table['line_lab'].eq(line)][lim].values[0] #
         except:
             pass
     '''
@@ -146,58 +158,79 @@ for ii in range(0,len(labels)):
         yerr=np.log10(err))
     #--------------------------------------------------------------
     '''
+    
     #-----------------For A vs B plot---------------------------------------------
     if np.abs(a) > 0 and np.abs(b) > 0:
         pl=ax1.errorbar(b, a, fmt='o', lw=0.5, yerr=avar, xerr=bvar, color=color)
         height = ax1.get_ylim()[1] - ax1.get_ylim()[0]
-        ax1.annotate(labels[ii], xy=(b,a), xytext=(b,a-0.05*height),color=color,fontsize=10)
+        ax1.annotate(labels[ii], xy=(b,a), xytext=(b,a-0.02*height),color=color,fontsize=10)
     elif np.abs(a) > 0 and np.abs(d) > 0:
         pl=ax1.errorbar(d, a, capsize=5, elinewidth=1, yerr=avar, lolims=True, color=color)
+        height = ax1.get_ylim()[1] - ax1.get_ylim()[0]
+        ax1.annotate(labels[ii], xy=(d,a), xytext=(d,a-0.02*height),color=color,fontsize=10)
     elif np.abs(b) > 0 and np.abs(c) > 0:
         pl=ax1.errorbar(b, c, capsize=5, elinewidth=1, xerr=bvar, uplims=True, color=color)
+        height = ax1.get_ylim()[1] - ax1.get_ylim()[0]
+        ax1.annotate(labels[ii], xy=(b,c), xytext=(b,c-0.02*height),color=color,fontsize=10)
     elif np.abs(c) > 0 and np.abs(d) > 0:
         pl=ax1.errorbar(d, c, fmt='*', lw=2, color=color)
+        height = ax1.get_ylim()[1] - ax1.get_ylim()[0]
+        ax1.annotate(labels[ii], xy=(d,c), xytext=(d,c-0.02*height),color=color,fontsize=10)
+    #--------------------------------------------------------------
+    
+    '''
+    #------------------For A (line) vs redshift index plot--------------------------------------------
+    if np.abs(a) > 0:
+        #pl=ax1.errorbar(z/len(lines_num), -a, fmt='o', lw=0.5, xerr=zu/len(lines_num), yerr=np.sqrt(avar))
+        pl=ax1.errorbar(z, -1.*a, fmt='o', lw=0.5, xerr=zu, yerr=np.sqrt(avar))
     #--------------------------------------------------------------
     '''
-    #------------------For A (line) vs object index plot--------------------------------------------
-    if a < 0:
-        #pl=ax1.errorbar(z/len(lines_num), -1*a, fmt='o', lw=0.5, xerr=zu/len(lines_num), yerr=np.sqrt(avar))
-        pl=ax1.errorbar(z, -1*a, fmt='o', lw=0.5, xerr=zu, yerr=np.sqrt(avar))
-    
+    '''
+    #------------------For A (line) vs line index histogram--------------------------------------------
     for jj, line in enumerate(lines.LineID):
-        if table['line_lab'].isin([line]).any():
-            #h[jj] += 1
-            ew[jj+1] = table[table['line_lab'].isin([line])].EWr_fit.values[0]
-            ewu[jj+1] = table[table['line_lab'].isin([line])].EWr_fit_u.values[0]
-
-    try:
-        #plt.bar(range(len(lines)), h, lw=0, align = 'center', color=color])
-        #pl=plt.errorbar(range(len(ew)), ew, fmt='o', lw=0.5, yerr=ewu)
-        pl=plt.errorbar(range(len(table)), table.EWr_fit.values, fmt='o', lw=0.5, yerr=table.EWr_fit_u.values)
-        plt.xticks(range(len(lines)+2),np.concatenate(([' '],lines.LineID.values,[' '])), rotation = 90, fontsize='small')
-        print pl[0].get_color(), table.label.values[0], len(table)    
-    except:
-        pass
-    #--------------------------------------------------------------
-    '''
-
-    t = 'Comparing_'+quantity
-    ylab = '('+'+'.join(lines_num)+')'#'('+'+'.join(lines_num)+')_by_('+'+'.join(lines_den)+')'
-    xlab = '('+'+'.join(lines_den)+')'#'obj'
-    
-    plt.ylabel(ylab)
-    plt.xlabel(xlab)
-    plt.title(t)
-    if 'f' in quantity:
-        plt.yscale('log')
-        plt.xscale('log')
-    #plt.pause(0.1)
-
+        if table['line_lab'].isin([line]).any() and detect(table,line):
+            h[jj] += 1
+fig=plt.figure(figsize=(16,8))
+fig.subplots_adjust(hspace=0.7, top=0.94, bottom=0.1, left=0.06, right=0.98)
+plt.bar(range(len(lines)), h, lw=0, align = 'center', color=color)
+plt.xticks(range(len(lines)+1),np.concatenate((lines.LineID.values,[' '])), rotation = 90, fontsize='small')
+#--------------------------------------------------------------
+'''    
 '''
+#------------------For A (line) vs line index plot--------------------------------------------
+try:
+    pl=plt.errorbar(range(len(table)), table.EWr_fit.values, fmt='o', lw=0.5, yerr=table.EWr_fit_u.values)
+    plt.xticks(range(len(lines)+2),np.concatenate(([' '],lines.LineID.values,[' '])), rotation = 90, fontsize='small')
+    print pl[0].get_color(), table.label.values[0], len(table)    
+except:
+    pass
+#--------------------------------------------------------------
+'''
+    
+    
+t = 'Comparing_'+quantity#'lines_detected_histogram'#
+ylab = '('+'+'.join(lines_num)+')'#'Number_of_galaxies'#'('+'+'.join(lines_num)+')_by_('+'+'.join(lines_den)+')' #
+xlab = '('+'+'.join(lines_den)+')'#'linesID'#
+extend = 0 #to extend plot region
+plt.ylabel(ylab)
+plt.xlabel(xlab)
+plt.title(t)
+#plt.yscale('log')
+if 'f_' in quantity:
+    plt.yscale('log')
+    plt.xscale('log')
+elif extend:
+    plt.xlim(ax1.get_xlim()[0],0.5)
+    plt.ylim(ax1.get_ylim()[0],0.5)
+#plt.pause(0.1)
+    
+'''
+#----------For anything vs line index plot----------------------------------------------------
 ax2 = ax1.twiny()
 ax2.set_xlim(ax1.get_xlim())
 ax2.set_xticks(lines.restwave)
 ax2.set_xticklabels(lines.LineID, rotation = 45, ha='left', fontsize='small')
+#--------------------------------------------------------------
 '''
 '''
 #----------For anything vs object index plot----------------------------------------------------
@@ -206,7 +239,13 @@ ax1.set_xticklabels(labels, rotation = 45, ha='right', fontsize='small')
 plt.xlim(0,len(labels)+1)
 #--------------------------------------------------------------
 '''
-out = output_path+t+'_'+ylab+'_vs_'+xlab+'.png'
+
+out = output_path+t+'_'+ylab+'_vs_'+xlab+'_all.png'
+#out = 'junk' #
 fig.savefig(out)
 print 'Saved as', out
 plt.show(block=False)
+
+for line in lines_num:
+    print new_tab[new_tab['line_lab'].eq(line)].sort('EWr_fit')
+    print ''
