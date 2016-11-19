@@ -23,10 +23,7 @@ if args.n is not None:
 else:
     n=50
 #---------to see if detected-----------
-def detect(table, line):
-    #print table[['label','line_lab']] #
-    #print line #
-    #print table[table['line_lab'].eq(line)] #
+def detect(table, line, ew_thresh=4, fSNR_thresh=1):
     if table[table['line_lab'].eq(line)].EW_signi.values[0] > ew_thresh and (table[table['line_lab'].eq(line)].f_line.values[0]/table[table['line_lab'].eq(line)].f_line_u.values[0] > fSNR_thresh):
         return True
     else:
