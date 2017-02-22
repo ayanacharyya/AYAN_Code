@@ -1,6 +1,6 @@
 ''' Equivalent width and flux fitter.  Given a spectrum, a continuum, a linelist, and a redshift,
 fit a bunch of emission or absorption lines.
-Started july 2016, Jane Rigby and Ayan Acharyya
+Started july 2016, Jane Rigby and Ayan acharyya
 
 README
 Usage: python EW_fitter.py --<options>
@@ -27,9 +27,9 @@ Usage: python EW_fitter.py --<options>
 --check ; boolean option, if present then prints at the end the root mean square deviation of 1 sigma error between EWs
         computed via fitting and via summing
 --allspec ; boolean option, if present then run the code over all the individual spectra files
---allbyneb ; boolean option, if present then run the code over all the byneb stacked spectra files, automatically
+--stackbyneb ; boolean option, if present then run the code over all the byneb stacked spectra files, automatically
             knows only to fit the emission line list and suitable fout (output file name)
---allbystars ; boolean option, if present then run the code over all the bystars stacked spectra files, automatically
+--stackbystars ; boolean option, if present then run the code over all the bystars stacked spectra files, automatically
             knows only to fit the photospheric line list and suitable fout (output file name)
 --savepdf ; boolean option, if present then save the plots as pdfs
 --noplot ; boolean option, if present then does not create any plot
@@ -81,10 +81,10 @@ parser.add_argument('--allspec', dest='allspec', action='store_true')
 parser.set_defaults(allspec=False)
 parser.add_argument('--allesi', dest='allesi', action='store_true')
 parser.set_defaults(allesi=False)
-parser.add_argument('--allbyneb', dest='allbyneb', action='store_true')
-parser.set_defaults(allbyneb=False)
-parser.add_argument('--allbystars', dest='allbystars', action='store_true')
-parser.set_defaults(allbystars=False)
+parser.add_argument('--stackbyneb', dest='stackbyneb', action='store_true')
+parser.set_defaults(stackbyneb=False)
+parser.add_argument('--stackbystars', dest='stackbystars', action='store_true')
+parser.set_defaults(stackbystars=False)
 parser.add_argument('--savepdf', dest='savepdf', action='store_true')
 parser.set_defaults(savepdf=False)
 parser.add_argument('--hide', dest='hide', action='store_true')
@@ -103,7 +103,7 @@ if args.dx is not None:
 else:
     dx = 310.
 if args.only is not None:
-   display_only_success = args.only
+   display_only_success = int(args.only)
 else:
     display_only_success = 1
 if args.frame is not None:
@@ -114,25 +114,15 @@ if args.shortlabel is not None:
     labels = [item for item in args.shortlabel.split(',')]
 else:
     labels = ['rcs0327-E']
-if args.allbyneb:
+if args.stackbyneb:
     labels = [
     'magestack_byneb_standard',\
-    'magestack_byneb_highZ',\
-    'magestack_byneb_lowZ',\
-    'magestack_byneb_midage8to16Myr',\
-    'magestack_byneb_oldgt16Myr',\
-    'magestack_byneb_younglt8Myr',\
     ]
     listname = 'emission'
     fout = path + 'all_byneb_stack_fitted_emission_linelist.txt'
-if args.allbystars:
+if args.stackbystars:
     labels = [
     'magestack_bystars_standard',\
-    'magestack_bystars_highZ',\
-    'magestack_bystars_lowZ',\
-    'magestack_bystars_midage8to16Myr',\
-    'magestack_bystars_oldgt16Myr',\
-    'magestack_bystars_younglt8Myr',\
     ]
     listname = 'photospheric'
     fout = path + 'all_bystars_stack_fitted_photospheric_linelist.txt'
@@ -158,6 +148,11 @@ if args.allesi:
     's2340_a2_b_esi',\
     's2340_a3_b_esi',\
     's2340_a4_b_esi',\
+    'J1050_2_b_esi',\
+    'J1050_3_b_esi',\
+    'J1050_arc_a_esi',\
+    'J1458_arc_a_esi',\
+    'J1458_arc_b_esi',\
     ]
     fout = path + 'allesi_fitted_'+listname+'_linelist.txt'
 if args.allspec:
@@ -203,7 +198,7 @@ if not args.keepprev:
 (spec_path, line_path) = jrr.mage.getpath(mage_mode)
 line_table = pd.DataFrame(columns=['label', 'line_lab', 'obs_wav', 'rest_wave', 'type','EWr_fit','EWr_fit_u', 'EWr_sum', \
 'EWr_sum_u', 'f_line','f_line_u', \
-'EWr_Suplim', 'f_Suplim', 'fit_cont','fit_f','fit_cen', 'fit_cen_u', \
+'EWr_Suplim', 'EW_signi', 'f_Suplim', 'f_signi', 'fit_cont','fit_f','fit_cen', 'fit_cen_u', \
 'fit_sig','zz','zz_u'])
 
 for ii in range(0, len(specs)) :                  
@@ -232,7 +227,7 @@ for ii in range(0, len(specs)) :
         if 'stack' not in shortlabel:
             if args.mymask:
                 m.flag_skylines(sp_orig) #modified masking for skylines, as compared to jrr.mage.flag_skylines
-            if 'esi' not in shortlabel:
+            elif 'esi' not in shortlabel:
                 sp_orig = sp_orig[~sp_orig['badmask']].copy(deep=True)
         #-----calculating MAD error over entire spectrum--------
         if args.fullmad:
@@ -241,6 +236,7 @@ for ii in range(0, len(specs)) :
         #------calculating the EW limits at every point following Schneider et al. 1993---------
         m.calc_schneider_EW(sp_orig, resoln, plotit=args.showerr)
         #m.makelist(line_path+'stacked.linelist') #required if you need to make a new labframe.shortlinelist file
+        #sys.exit() #
         line_full = m.getlist('labframe.shortlinelist_'+listname, zz_dic, zz_err_dic)
         #------------Preparing to plot----------------------------------------
         xstart = max(np.min(line_full.wave) - 50.,np.min(sp_orig.wave))
@@ -272,16 +268,16 @@ for ii in range(0, len(specs)) :
                 print 'None of the requested frames have any line in them. Try with a different frame number.'
                 continue
         #------------------------------------------------------------
-        nrow = 4 #frames per page
-        n_subarr = np.array_split(n_arr, int(np.ceil(float(len(n_arr)/nrow))))
+        nrow = 4 #maximum frames per page
+        n_subarr = np.array_split(n_arr, int(np.ceil(len(n_arr)/float(nrow))))
         for ss in range(len(n_subarr)):
             n_arr = n_subarr[ss]
             n = len(n_arr)
             if not args.noplot:
                 fig = plt.figure(figsize=(18+10/(n+1),(12 if n > 2 else n*3)))
                 #fig = plt.figure(figsize=(14+8/(n+1),(9 if n > 2 else n*3)))
-                plt.title(shortlabel + "  z=" + str(zz_sys)+'.\n Vertical lines legend: Blue=initial guess of center,'+\
-                ' Red=fitted center, Green=no detection(< 3sigma), Black=unable to fit gaussian', y=1.02)
+                if not args.see: plt.title(shortlabel + "  z=" + str(zz_sys)+'.\n Vertical lines legend: Blue=initial guess of center,'+\
+                ' Red=fitted center, Black=no detection(upper limit)', y=1.02)
             for fc, jj in enumerate(n_arr):
                 xmin = xstart + jj*dx
                 xmax = min(xmin + dx, xlast)
@@ -323,17 +319,25 @@ for ii in range(0, len(specs)) :
                     ax2.set_xticks(np.concatenate([ax2.get_xticks(), line.wave]))
                     ax2.set_xlim(ax1.get_xlim())       
                     ax2.set_xticklabels(np.concatenate([labels2,np.array(line.label.values).tolist()]), rotation = 45, ha='left', fontsize='small')
-                    fig.subplots_adjust(hspace=0.7, top=0.94, bottom=0.05, left=0.05, right=0.95)
-            if not args.hide:
-                plt.show(block=False)
+                    if not args.see:
+                        fig.subplots_adjust(hspace=0.7, top=0.94, bottom=0.05, left=0.06, right=0.95)
+                    else:
+                        fig.subplots_adjust(hspace=0.7, top=0.8, bottom=0.1, left=0.07, right=0.95)
+                    fig.text(0.5, 0.02, 'Observed Wavelength (A)', ha='center')
+                    if not args.see: fig.text(0.02, 0.5, 'f_nu (ergs/s/cm^2/Hz)', va='center', rotation='vertical')
+                    else: fig.text(0.03, 0.5, 'f_nu (ergs/s/cm^2/Hz)', va='center', rotation='vertical')
             if args.savepdf:
                 pdf.savefig(fig)
+            if not args.hide: plt.show(block=False)
         if args.savepdf:
             pdf.close()
         #fig.savefig(name+'.png')
-    except:
-        print 'Could not successfully complete', shortlabel
+    
+    except Exception, e:
+        print 'Could not successfully complete', shortlabel, 'due to:'
+        print e
         continue
+    
 #------------changing data types------------------------------
 line_table.obs_wav = line_table.obs_wav.astype(np.float64)
 line_table.rest_wave = line_table.rest_wave.astype(np.float64)
@@ -352,17 +356,23 @@ line_table.fit_cen_u = line_table.fit_cen_u.astype(np.float64)
 line_table.fit_sig = line_table.fit_sig.astype(np.float64)
 line_table.zz = line_table.zz.astype(np.float64)
 line_table.zz_u = line_table.zz_u.astype(np.float64)
-line_table['EW_signi']=3.*line_table['EWr_fit']/line_table['EWr_Suplim']
-line_table['EW_signi']=line_table['EW_signi'].map('{:,.3f}'.format)
-line_table['f_signi']=3.*line_table['f_line']/line_table['f_Suplim']
-line_table['f_signi']=line_table['f_signi'].map('{:,.3f}'.format)
+line_table.EW_signi=line_table.EW_signi.astype(np.float64)
+line_table.f_signi=line_table.f_signi.astype(np.float64)
+if shortlabel == 'rcs0327-E':
+    print 'Extinction available for rcs0327-E. Performing redenning correction...'
+    E, E_u = 0.2, 0.1
+    line_table['f_redcor'],line_table['f_redcor_u']=m.extinct(line_table.rest_wave, line_table.f_line, line_table.f_line_u, E, E_u)
+    line_table['f_Suplim_redcor'],dummy=m.extinct(line_table.rest_wave, line_table.f_Suplim, line_table.f_line_u, E, E_u)
+    line_table['f_redcor']=line_table['f_redcor'].map('{:,.3e}'.format)
+    line_table['f_redcor_u']=line_table['f_redcor_u'].map('{:,.3e}'.format)
+    line_table['f_Suplim_redcor']=line_table['f_Suplim_redcor'].map('{:,.3e}'.format)
 #----------------Saving dataframe to ASCII file--------------------------------------------
 head = 'This file contains the measurements of lines in the MagE sample. Generated by EW_fitter.py.\n\
 Columns are:\n\
  label:       shortlabel of the galaxy/knot\n\
  line_lab:    label of the line the code was asked to fit\n\
- obs_wav:     observed frame wavelength of the line (A)\n\
- rest_wave:   rest frame wavelength of the line (A)\n\
+ obs_wav:     observed frame vacuum wavelength of the line (A)\n\
+ rest_wave:   rest frame vacuum wavelength of the line (A)\n\
  type:        is it emission or ism etc.\n\
  EWr_fit:     eqv width as calculated from the Gaussian fit to the line (A)\n\
  EWr_fit_u:  error in above qty. (A)\n\
@@ -387,9 +397,40 @@ Columns are:\n\
 np.savetxt(fout, [], header=head, comments='#')
 line_table.to_csv(fout, sep='\t',mode ='a', index=None)
 print 'Full table saved to', fout
-#----------Displaying part of dataframe if asked to---------------------------
+#----------Displaying and saving part of dataframe if asked to---------------------------
 line_table['f_SNR']=np.abs(line_table['f_line'])/line_table['f_line_u']
-short_table = line_table[['line_lab','EWr_fit','EWr_fit_u','EWr_Suplim','EW_signi','f_line','f_line_u','f_SNR','f_Suplim','f_signi']]
+if shortlabel == 'rcs0327-E':
+    short_table = line_table[['line_lab','rest_wave','EWr_fit','EWr_fit_u','EWr_Suplim','EW_signi','f_line','f_line_u','f_SNR','f_Suplim','f_signi','f_redcor','f_redcor_u','f_Suplim_redcor']]
+elif listname == 'trial': #For correcting zz_sys: to check redshifts using only strong emission lines
+    short_table = line_table[['label', 'line_lab','rest_wave','EWr_fit','EWr_fit_u','EW_signi','zz','zz_u']]
+    short_table.EW_signi = short_table.EW_signi.astype(np.float64)
+    short_table = short_table[short_table.EW_signi > 3.] #taking out undetected lines
+    fout = '/Users/acharyya/Dropbox/MagE_atlas/Contrib/EWs/zz_list_few_galx.txt'
+    head = 'This file contains the measurements of lines in the MagE sample. Generated by EW_fitter.py.\n\
+    Its for a few galaxies, using only bright emission lines, for the purpose of investigating the nebular redshifts.\n\
+    Columns are:\n\
+     label:       shortlabel of the galaxy/knot\n\
+     line_lab:    label of the line the code was asked to fit\n\
+     rest_wave:   rest frame vacuum wavelength of the line (A)\n\
+     EWr_fit:     eqv width as calculated from the Gaussian fit to the line (A)\n\
+     EWr_fit_u:  error in above qty. (A)\n\
+     EW_signi:    significance of detection\n\
+     zz:          Corrected redshift of this line, from the fitted center\n\
+     zz_u:        error in above qty.\n\
+     Only lines that had a EW_signi>3 (i.e. were detected) are included in this table and the analysis that follows.\n\
+    '
+    np.savetxt(fout, [], header=head, comments='#')
+    short_table.to_csv(fout, sep='\t',mode ='a', index=None)
+    with open(fout,'a') as myfile:
+        myfile.write('label\t\tzz_neb\t\tmean zz\t\tmedian zz\t\tmedian zz_u\n')
+        for ii in range(0, len(specs)) :                  
+            shortlabel = specs['short_label'][ii]
+            temp_table = short_table[short_table['label'].eq(shortlabel)]
+            myfile.write(shortlabel+'\t'+ str(specs['z_neb'][ii])+'\t'+str(np.mean(temp_table['zz']))+'\t'+str(np.median(temp_table['zz']))+'\t'+str(np.median(temp_table['zz_u']))+'\n')
+    print 'Created file', fout
+else:
+    short_table = line_table[['line_lab','rest_wave','EWr_fit','EWr_fit_u','EWr_Suplim','EW_signi','f_line','f_line_u','f_SNR','f_Suplim','f_signi']]
+
 print 'Some columns of the table are:'
 print short_table
 #-------------For correcting zz_ism------------------

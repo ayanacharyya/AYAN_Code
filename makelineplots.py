@@ -2,7 +2,7 @@
 Makes different line ratio plots, using information from the dataframe resulting from line fitting using EW_fitter.py
 For now its not automated, hence you have to manually comment out/modify this each time to get a different line ratio
 plot. Still a the crude version.
-Started July 2016, Ayan Acharyya
+Started July 2016, Ayan acharyya
 '''
 import sys
 sys.path.append('../')
@@ -40,12 +40,12 @@ lines = pd.read_table('labframe.shortlinelist_emission', delim_whitespace=True, 
 excludelabel = ['magestack_byneb_highZ', 'magestack_byneb_lowZ', 'magestack_byneb_midage8to16Myr', \
 'magestack_byneb_oldgt16Myr', 'magestack_byneb_younglt8Myr']#'S0004-0103']#'rcs0327-E']#'S0957+0509']#,'S1050+0017',]# 'S1429+1202'] #which spectra to exclude
 fulltable = fulltable[~fulltable['label'].isin(excludelabel)] #
-labels = np.unique(fulltable['label'])
+labels = pd.unique(fulltable['label'])
 colors = 'rcmybgrmcybgrmcybg' #color schemes
 #------------------------------------------------
 lines_num = ['OIII]1660','OIII]1666']
 #lines_num = ['[OIII]2320', '[OIII]2331']
-#lines_den = ['OII2470mid']
+lines_den = ['OII2470mid']
 
 #lines_num = ['CIII977']
 #lines_num = ['CIII]1906', 'CIII]1908']
@@ -60,7 +60,7 @@ lines_num = ['OIII]1660','OIII]1666']
 #lines_den = ['NII1084', 'NII1085'] #not there in emission linelist
 #lines_den = ['NII]2140']
 
-lines_den = ['HeII1640']
+#lines_den = ['HeII1640']
 #------------------------------------------------
 #for line in lines.LineID.values:
 fig, ax1 = plt.subplots(1,1)
@@ -155,26 +155,26 @@ for ii in range(0,len(labels)):
         yerr=np.log10(err))
     #--------------------------------------------------------------
     '''
-    
+    '''
     #-----------------For A vs B plot---------------------------------------------
     if np.abs(a) > 0 and np.abs(b) > 0:
         pl=ax1.errorbar(b, a, fmt='o', lw=0.5, yerr=avar, xerr=bvar, color=color)
         height = ax1.get_ylim()[1] - ax1.get_ylim()[0]
-        ax1.annotate(labels[ii], xy=(b,a), xytext=(b,a-0.02*height),color=color,fontsize=10)
+        ax1.annotate(labels[ii], xy=(b,a), xytext=(b,a-0.01*height),color=color,fontsize=10)
     elif np.abs(a) > 0 and np.abs(d) > 0:
-        pl=ax1.errorbar(d, a, capsize=5, elinewidth=1, yerr=avar, lolims=True, color=color)
+        pl=ax1.errorbar(d, a, capsize=5, elinewidth=1, yerr=avar, fmt=color+'<')
         height = ax1.get_ylim()[1] - ax1.get_ylim()[0]
-        ax1.annotate(labels[ii], xy=(d,a), xytext=(d,a-0.02*height),color=color,fontsize=10)
+        ax1.annotate(labels[ii], xy=(d,a), xytext=(d,a-0.01*height),color=color,fontsize=10)
     elif np.abs(b) > 0 and np.abs(c) > 0:
-        pl=ax1.errorbar(b, c, capsize=5, elinewidth=1, xerr=bvar, uplims=True, color=color)
+        pl=ax1.errorbar(b, c, capsize=5, elinewidth=1, xerr=bvar, fmt=color+'v')
         height = ax1.get_ylim()[1] - ax1.get_ylim()[0]
-        ax1.annotate(labels[ii], xy=(b,c), xytext=(b,c-0.02*height),color=color,fontsize=10)
+        ax1.annotate(labels[ii], xy=(b,c), xytext=(b,c-0.01*height),color=color,fontsize=10)
     elif np.abs(c) > 0 and np.abs(d) > 0:
         pl=ax1.errorbar(d, c, fmt='*', lw=2, color=color)
         height = ax1.get_ylim()[1] - ax1.get_ylim()[0]
-        ax1.annotate(labels[ii], xy=(d,c), xytext=(d,c-0.02*height),color=color,fontsize=10)
+        ax1.annotate(labels[ii], xy=(d,c), xytext=(d,c-0.01*height),color=color,fontsize=10)
     #--------------------------------------------------------------
-    
+    '''
     '''
     #------------------For A (line) vs redshift index plot--------------------------------------------
     if np.abs(a) > 0:
@@ -183,7 +183,7 @@ for ii in range(0,len(labels)):
     #--------------------------------------------------------------
     '''
     '''
-    #------------------For A (line) vs line index histogram--------------------------------------------
+    #------------------For no. of galaxies vs line index histogram--------------------------------------------
     for jj, line in enumerate(lines.LineID):
         if table['line_lab'].isin([line]).any() and detect(table,line):
             h[jj] += 1
@@ -193,6 +193,17 @@ plt.bar(range(len(lines)), h, lw=0, align = 'center', color=color)
 plt.xticks(range(len(lines)+1),np.concatenate((lines.LineID.values,[' '])), rotation = 90, fontsize='small')
 #--------------------------------------------------------------
 '''    
+    
+    #------------------For no. of lines vs galaxy index histogram--------------------------------------------
+    for jj, line in enumerate(lines.LineID):
+        if table['line_lab'].isin([line]).any() and detect(table,line):
+            g[ii] += 1
+fig=plt.figure(figsize=(16,8))
+fig.subplots_adjust(hspace=0.7, top=0.94, bottom=0.2, left=0.06, right=0.98)
+plt.bar(range(len(labels)), g, lw=0, align = 'center', color=color)
+plt.xticks(range(len(labels)+1),np.concatenate((labels,[' '])), rotation = 90, fontsize='small')
+#--------------------------------------------------------------
+    
 '''
 #------------------For A (line) vs line index plot--------------------------------------------
 try:
@@ -205,9 +216,9 @@ except:
 '''
     
     
-t = 'Comparing_'+quantity#'lines_detected_histogram'#
-ylab = '('+'+'.join(lines_num)+')'#'Number_of_galaxies'#'('+'+'.join(lines_num)+')_by_('+'+'.join(lines_den)+')' #
-xlab = '('+'+'.join(lines_den)+')'#'linesID'#
+t = 'lines_detected_histogram'#'Comparing_'+quantity#
+ylab = 'Number_of_lines_detected'#'('+'+'.join(lines_num)+')'#'Number_of_galaxies'#'('+'+'.join(lines_num)+')_by_('+'+'.join(lines_den)+')' #
+xlab = 'objectID'#'('+'+'.join(lines_den)+')'#'linesID'#
 extend = 0 #to extend plot region
 plt.ylabel(ylab)
 plt.xlabel(xlab)
@@ -220,7 +231,8 @@ elif extend:
     plt.xlim(ax1.get_xlim()[0],0.5)
     plt.ylim(ax1.get_ylim()[0],0.5)
 #plt.pause(0.1)
-    
+#plt.xlim(-0.5,0)    
+#plt.ylim(-1,0)    
 '''
 #----------For anything vs line index plot----------------------------------------------------
 ax2 = ax1.twiny()
@@ -242,7 +254,9 @@ out = output_path+t+'_'+ylab+'_vs_'+xlab+'_all.png'
 fig.savefig(out)
 print 'Saved as', out
 plt.show(block=False)
-
+'''
+new_tab['f_SNR']=np.abs(new_tab['f_line'])/new_tab['f_line_u']
 for line in lines_num:
     print new_tab[new_tab['line_lab'].eq(line)].sort('EWr_fit')
     print ''
+'''

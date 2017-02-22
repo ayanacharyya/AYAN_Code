@@ -1,0 +1,15 @@
+#New customised linelist only for few strong emission lines
+#restwave is in vacuum
+#Columns are:
+LineID  restwave    type    source
+
+OIII]1666   1666.15   EMISSION   MAPPINGS
+SiIII1882   1882.707   EMISSION   MAPPINGS
+SiIII1892   1892.029   EMISSION   MAPPINGS
+CIII]1906   1906.68   EMISSION   Leitherer
+CIII]1908   1908.73   EMISSION   Leitherer
+CII2325b   2325.403   EMISSION   MAPPINGS
+CII2325c   2326.113   EMISSION   MAPPINGS
+CII2325d   2327.645   EMISSION   MAPPINGS
+OII2470mid   2471.027   EMISSION   MAPPINGS
+#mean-line
