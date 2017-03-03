@@ -8,16 +8,23 @@ Usage: python EW_fitter.py --<options>
 --fcen FCEN ; FCEN = 1 if initial guess for gaussian centers are to be fixed, default 0(False)
 --fcon FCON ; FCON = 1 if initial guess for continuum is to be fixed, default 1(True)
 --dx DX ; DX = how many angstroms of wavelength should be plotted in one panel in the final plot, default = 300A
+--resoln RESOLUTION ; RESOLUTION = instrument spectral resolution R, needs to be specified only for 
+                    non-esi, non-mage and non-stack spectra (i.e. any spectrum file which does not have 'esi' or
+                    'stack' in its name and also doesn't belong to the MagE sample), default R = 4000
+--dresoln RESOLUTION_U ; RESOLUTION_U = uncertainty in instrument spectral resolution R, needs to be specified only for 
+                    non-esi, non-mage and non-stack spectra (i.e. any spectrum file which does not have 'esi' or
+                    'stack' in its name and also doesn't belong to the MagE sample), default RESOLUTION_U = 40
 --only ONLY ; ONLY = 1 if final plot should have only those panels(patches of wavelength axis) where a line was fitted,
                 else 0 to display all frames, default = 1
 --vmax VMAX ; VMAX = in km/s, to set the maximum FWHM that can be fit as a line, default = 300km/s
 --frame FRAME ; FRAME = index of the panel if you want to see specific panels, the panel indices can be found in top 
                 left of each panel in the final plot, default plots all frames
---nbin NBIN ; NBIN = # of wavelength points to be binned together to calculate median and MAD binned fluxes and errors
+--nbin NBIN ; NBIN = # of wavelength points to be binned together to calculate median and MAD binned fluxes and errors; NOT USED anymore
 --lines LINES ; LINES = 'emission' OR 'photospheric' depending on which lines you want to be fit, linelists can be 
                 found in files labframe.shortlinelist_emission and labframe.shortlinelist_photospheric, respectively.
                 default = emission
 --fout FOUT ; FOUT = filename you want the output ASCII file to have, default = fitted_line_list.txt
+--spec_list_file FILENAME ; FILENAME = filename of the spectra list file you want to be used, instead of the usual spectra_redshift.txt
 --see LABEL ; LABEL = line label you want to check (string) if you want to see only the frame containing a relevant line \
                     and not the whole spectrum, default = None (shows all lines)
 --keepprev ; boolean option, if present then doesn't kill the previous matplotlib plots
@@ -54,14 +61,16 @@ from matplotlib import pyplot as plt
 mage_mode = "released"
 import argparse as ap
 from matplotlib.backends.backend_pdf import PdfPages
-
+HOME ='/Users/acharyya/'
 #-----------Main function starts------------------
-path = '/Users/acharyya/Dropbox/MagE_atlas/Contrib/EWs/' #directory to store the resulting output files
+path = HOME+'Dropbox/MagE_atlas/Contrib/EWs/' #directory to store the resulting output files
 parser = ap.ArgumentParser(description="Mage spectra fitting tool")
 parser.add_argument("--shortlabel")
 parser.add_argument("--fcen")
 parser.add_argument("--fcon")
 parser.add_argument("--dx")
+parser.add_argument("--resoln")
+parser.add_argument("--dresoln")
 parser.add_argument("--only")
 parser.add_argument("--vmax")
 parser.add_argument("--frame")
@@ -69,6 +78,7 @@ parser.add_argument("--nbin")
 parser.add_argument("--lines")
 parser.add_argument("--fout")
 parser.add_argument("--see")
+parser.add_argument("--spec_list_file")
 parser.add_argument('--keepprev', dest='keepprev', action='store_true')
 parser.set_defaults(keepprev=False)
 parser.add_argument('--silent', dest='silent', action='store_true')
@@ -102,6 +112,14 @@ if args.dx is not None:
     dx = float(args.dx)
 else:
     dx = 310.
+if args.resoln is not None:
+    resoln = float(args.resoln)
+else:
+    resoln = 4000.
+if args.dresoln is not None:
+    dresoln = float(args.dresoln)
+else:
+    dresoln = 40.
 if args.only is not None:
    display_only_success = int(args.only)
 else:
@@ -194,7 +212,23 @@ if not args.keepprev:
     plt.close('all')
 
 #-------------------------------------------------------------------------
-(specs) = jrr.mage.getlist_labels(mage_mode, labels, optional_file='/Users/acharyya/Desktop/mage_plot/Spectra/spectra-filenames-redshifts.txt')
+specs = jrr.mage.getlist(mage_mode) #loading default spectra_redshift.txt file
+loaded_esi, loaded_stack, loaded_other = False, False, False
+for thislabel in labels:
+    if 'esi' in thislabel and not loaded_esi:
+        optional_file = HOME+'Desktop/mage_plot/Spectra/esi-spectra-filenames-redshifts.txt'
+        loaded_esi = True
+        specs = specs.append(jrr.mage.getlist(mage_mode, optional_file=optional_file)) #appending spectra_redshift.txt file for esi if there is any esi spectra to be fit
+    if 'new-format' in thislabel and not loaded_other:
+        optional_file = args.spec_list_file
+        loaded_other = True
+        specs = specs.append(jrr.mage.getlist(mage_mode, optional_file=optional_file)) #appending spectra_redshift.txt file for other spectra if there is any
+    elif 'stack' in thislabel and not loaded_stack:
+        optional_file = HOME+'Dropbox/mage_atlas/Spectra/stacked-spectra-filenames-redshifts.txt'
+        loaded_stack = True
+        specs = specs.append(jrr.mage.getlist(mage_mode, optional_file=optional_file)) #appending spectra_redshift.txt file for stack if there is any stacked spectra to be fit
+
+specs = specs[specs['short_label'].isin(labels)] #curtailing specs to only those spectra that are to be fit
 (spec_path, line_path) = jrr.mage.getpath(mage_mode)
 line_table = pd.DataFrame(columns=['label', 'line_lab', 'obs_wav', 'rest_wave', 'type','EWr_fit','EWr_fit_u', 'EWr_sum', \
 'EWr_sum_u', 'f_line','f_line_u', \
@@ -202,142 +236,145 @@ line_table = pd.DataFrame(columns=['label', 'line_lab', 'obs_wav', 'rest_wave', 
 'fit_sig','zz','zz_u'])
 
 for ii in range(0, len(specs)) :                  
-    try:
-        shortlabel     = specs['short_label'][ii]
-        print 'Spectrum', (ii+1), 'of', len(specs),':', shortlabel #Debugging
-        filename  = specs['filename'][ii]
-        zz_sys = specs['z_syst'][ii] # from the new z_syst column in spectra_filename file
-        zz_dic = {'EMISSION':specs['z_neb'][ii], 'FINESTR':specs['z_neb'][ii], 'PHOTOSPHERE': specs['z_stars'][ii] if specs['fl_st'][ii]==0 else specs['z_neb'][ii], 'ISM':specs['z_ISM'][ii], 'WIND':specs['z_ISM'][ii]}
-        zz_err_dic = {'EMISSION':specs['sig_neb'][ii] if specs['fl_neb'][ii]==0 else specs['sig_ISM'][ii], 'FINESTR':specs['sig_neb'][ii] if specs['fl_neb'][ii]==0 else specs['sig_ISM'][ii], 'PHOTOSPHERE': specs['sig_st'][ii] if specs['fl_st'][ii]==0 else specs['sig_neb'][ii], 'ISM':specs['sig_ISM'][ii], 'WIND':specs['sig_ISM'][ii]}    
-        #-----------reading spec in different formats----------------------------
-        if 'esi' in shortlabel:
-            specdir = '/Users/acharyya/Documents/esi_2016b/2016aug27_2x1/IRAF/reduced/'
-            sp_orig = m.open_esi_spectrum(specdir+filename, getclean=True) # alt_infile= Put the filename of the stacked spectrum file here
-            resoln = 4000.   # ESI spectral resoln for 1" slit
-            dresoln = 40.       #         
-        elif 'stack'in shortlabel:
-            sp_orig = jrr.mage.open_stacked_spectrum(mage_mode, alt_infile=filename) # alt_infile= Put the filename of the stacked spectrum file here
-            resoln = 3e5/200.   # vel resol of 200km/s from file /Users/acharyya/Dropbox/mage_atlas/Contrib/S99/stack-A-sb99-fit.txt
-            dresoln = 40.       # 
-        else:
-            (sp_orig, resoln, dresoln)  = jrr.mage.open_spectrum(filename, zz_sys, mage_mode)
-        #-----------fitting continuum----------------------------
-        m.fit_autocont(sp_orig, zz_sys, line_path,filename)
-        #-------masking sky lines-----------------
-        if 'stack' not in shortlabel:
-            if args.mymask:
-                m.flag_skylines(sp_orig) #modified masking for skylines, as compared to jrr.mage.flag_skylines
-            elif 'esi' not in shortlabel:
-                sp_orig = sp_orig[~sp_orig['badmask']].copy(deep=True)
-        #-----calculating MAD error over entire spectrum--------
-        if args.fullmad:
-            m.calc_mad(sp_orig, resoln, 5)
-            continue
-        #------calculating the EW limits at every point following Schneider et al. 1993---------
-        m.calc_schneider_EW(sp_orig, resoln, plotit=args.showerr)
-        #m.makelist(line_path+'stacked.linelist') #required if you need to make a new labframe.shortlinelist file
-        #sys.exit() #
-        line_full = m.getlist('labframe.shortlinelist_'+listname, zz_dic, zz_err_dic)
-        #------------Preparing to plot----------------------------------------
-        xstart = max(np.min(line_full.wave) - 50.,np.min(sp_orig.wave))
-        xlast = min(np.max(line_full.wave) + 50.,np.max(sp_orig.wave))
-        if frame is None:
-            n_arr = np.arange(int(np.ceil((xlast-xstart)/dx))).tolist()
-        else:
-            n_arr = [int(ar)-1 for ar in frame.split(',')] #Use this to display selected frame/s
-        name = path + listname+'/'+shortlabel+'-'+listname+'_fit'
-        if args.savepdf:
-            pdf = PdfPages(name+'.pdf')
-        #---------pre check in which frames lines are available if display_only_success = 1---------
-        #---------------------------just a visualisation thing-----------------------------------
-        if display_only_success:
-            for jj in range(len(n_arr)):
-                xmin = xstart + n_arr[jj]*dx
-                xmax = min(xmin + dx, xlast)
-                sp = sp_orig[sp_orig['wave'].between(xmin,xmax)]
-                try:
-                    line = line_full[line_full['wave'].between(xmin*(1.+5./resoln), xmax*(1.-5./resoln))]
-                except IndexError:
-                    continue
-                if not len(line) > 0 or not line['wave'].between(np.min(sp.wave),np.max(sp.wave)).all():
-                    n_arr[jj] = np.ma.masked
-                if args.see is not None and not any(args.see in x for x in line.label.values):
-                    n_arr[jj] = np.ma.masked
-            n_arr = np.ma.compressed(n_arr)
-            if len(n_arr) < 1:
-                print 'None of the requested frames have any line in them. Try with a different frame number.'
+    #try:
+    shortlabel = specs['short_label'][ii]
+    print 'Spectrum', (ii+1), 'of', len(specs),':', shortlabel #Debugging
+    filename  = specs['filename'][ii]
+    zz_sys = specs['z_syst'][ii] # from the new z_syst column in spectra_filename file
+    zz_dic = {'EMISSION':specs['z_neb'][ii], 'FINESTR':specs['z_neb'][ii], 'PHOTOSPHERE': specs['z_stars'][ii] if specs['fl_st'][ii]==0 else specs['z_neb'][ii], 'ISM':specs['z_ISM'][ii], 'WIND':specs['z_ISM'][ii]}
+    zz_err_dic = {'EMISSION':specs['sig_neb'][ii] if specs['fl_neb'][ii]==0 else specs['sig_ISM'][ii], 'FINESTR':specs['sig_neb'][ii] if specs['fl_neb'][ii]==0 else specs['sig_ISM'][ii], 'PHOTOSPHERE': specs['sig_st'][ii] if specs['fl_st'][ii]==0 else specs['sig_neb'][ii], 'ISM':specs['sig_ISM'][ii], 'WIND':specs['sig_ISM'][ii]}    
+    #-----------reading spec in different formats----------------------------
+    if 'esi' in shortlabel:
+        specdir = HOME+'Documents/esi_2016b/2016aug27_2x1/IRAF/reduced/'
+        sp_orig = m.open_esi_spectrum(specdir+filename, getclean=True)
+        resoln = 4000.   # ESI spectral resoln for 1" slit
+        dresoln = 40.    #         
+    elif 'new-format' in shortlabel:
+        specdir = specs['origdir'][ii]
+        sp_orig = m.open_esi_spectrum(specdir+filename, getclean=True) # open_esi_spectrum() can open any other spectra as well, if the other spectra has been converted to desired format
+    elif 'stack'in shortlabel:
+        sp_orig = jrr.mage.open_stacked_spectrum(mage_mode, alt_infile=filename) # alt_infile= Put the filename of the stacked spectrum file here
+        resoln = 3e5/200.   # vel resol of 200km/s from file /Users/acharyya/Dropbox/mage_atlas/Contrib/S99/stack-A-sb99-fit.txt
+        dresoln = 40.       # 
+    else:
+        (sp_orig, resoln, dresoln)  = jrr.mage.open_spectrum(filename, zz_sys, mage_mode)
+    #-----------fitting continuum----------------------------
+    m.fit_autocont(sp_orig, zz_sys, line_path,filename)
+    #-------masking sky lines-----------------
+    if 'stack' not in shortlabel:
+        if args.mymask:
+            m.flag_skylines(sp_orig) #modified masking for skylines, as compared to jrr.mage.flag_skylines
+        elif 'esi' not in shortlabel:
+            sp_orig = sp_orig[~sp_orig['badmask']].copy(deep=True)
+    #-----calculating MAD error over entire spectrum--------
+    if args.fullmad:
+        m.calc_mad(sp_orig, resoln, 5)
+        continue
+    #------calculating the EW limits at every point following Schneider et al. 1993---------
+    m.calc_schneider_EW(sp_orig, resoln, plotit=args.showerr)
+    #m.makelist(line_path+'stacked.linelist') #required if you need to make a new labframe.shortlinelist file
+    #sys.exit() #
+    line_full = m.getlist('labframe.shortlinelist_'+listname, zz_dic, zz_err_dic)
+    #------------Preparing to plot----------------------------------------
+    xstart = max(np.min(line_full.wave) - 50.,np.min(sp_orig.wave))
+    xlast = min(np.max(line_full.wave) + 50.,np.max(sp_orig.wave))
+    if frame is None:
+        n_arr = np.arange(int(np.ceil((xlast-xstart)/dx))).tolist()
+    else:
+        n_arr = [int(ar)-1 for ar in frame.split(',')] #Use this to display selected frame/s
+    name = path + listname+'/'+shortlabel+'-'+listname+'_fit'
+    if args.savepdf:
+        pdf = PdfPages(name+'.pdf')
+    #---------pre check in which frames lines are available if display_only_success = 1---------
+    #---------------------------just a visualisation thing-----------------------------------
+    if display_only_success:
+        for jj in range(len(n_arr)):
+            xmin = xstart + n_arr[jj]*dx
+            xmax = min(xmin + dx, xlast)
+            sp = sp_orig[sp_orig['wave'].between(xmin,xmax)]
+            try:
+                line = line_full[line_full['wave'].between(xmin*(1.+5./resoln), xmax*(1.-5./resoln))]
+            except IndexError:
                 continue
-        #------------------------------------------------------------
-        nrow = 4 #maximum frames per page
-        n_subarr = np.array_split(n_arr, int(np.ceil(len(n_arr)/float(nrow))))
-        for ss in range(len(n_subarr)):
-            n_arr = n_subarr[ss]
-            n = len(n_arr)
+            if not len(line) > 0 or not line['wave'].between(np.min(sp.wave),np.max(sp.wave)).all():
+                n_arr[jj] = np.ma.masked
+            if args.see is not None and not any(args.see in x for x in line.label.values):
+                n_arr[jj] = np.ma.masked
+        n_arr = np.ma.compressed(n_arr)
+        if len(n_arr) < 1:
+            print 'None of the requested frames have any line in them. Try with a different frame number.'
+            continue
+    #------------------------------------------------------------
+    nrow = 4 #maximum frames per page
+    n_subarr = np.array_split(n_arr, int(np.ceil(len(n_arr)/float(nrow))))
+    for ss in range(len(n_subarr)):
+        n_arr = n_subarr[ss]
+        n = len(n_arr)
+        if not args.noplot:
+            fig = plt.figure(figsize=(18+10/(n+1),(12 if n > 2 else n*3)))
+            #fig = plt.figure(figsize=(14+8/(n+1),(9 if n > 2 else n*3)))
+            if not args.see: plt.title(shortlabel + "  z=" + str(zz_sys)+'.\n Vertical lines legend: Blue=initial guess of center,'+\
+            ' Red=fitted center, Black=no detection(upper limit)', y=1.02)
+        for fc, jj in enumerate(n_arr):
+            xmin = xstart + jj*dx
+            xmax = min(xmin + dx, xlast)
             if not args.noplot:
-                fig = plt.figure(figsize=(18+10/(n+1),(12 if n > 2 else n*3)))
-                #fig = plt.figure(figsize=(14+8/(n+1),(9 if n > 2 else n*3)))
-                if not args.see: plt.title(shortlabel + "  z=" + str(zz_sys)+'.\n Vertical lines legend: Blue=initial guess of center,'+\
-                ' Red=fitted center, Black=no detection(upper limit)', y=1.02)
-            for fc, jj in enumerate(n_arr):
-                xmin = xstart + jj*dx
-                xmax = min(xmin + dx, xlast)
-                if not args.noplot:
-                    ax1 = fig.add_subplot(n,1,fc+1)
-                sp = sp_orig[sp_orig['wave'].between(xmin,xmax)]
-                ymin = min(0,np.min(sp.fnu_u)*0.98) #setting ylimits for plotting, to little lower than minimum value of the error
-                ymax = min(3,np.max(sp.fnu)*1.01) #little higher than maximum flux value
+                ax1 = fig.add_subplot(n,1,fc+1)
+            sp = sp_orig[sp_orig['wave'].between(xmin,xmax)]
+            ymin = min(0,np.min(sp.fnu_u)*0.98) #setting ylimits for plotting, to little lower than minimum value of the error
+            ymax = min(3,np.max(sp.fnu)*1.01) #little higher than maximum flux value
+            try:
+                line = line_full[line_full['wave'].between(xmin*(1.+5./resoln), xmax*(1.-5./resoln))]
+            except IndexError:
+                continue
+            #------------Plot the results------------
+            if not args.noplot:
                 try:
-                    line = line_full[line_full['wave'].between(xmin*(1.+5./resoln), xmax*(1.-5./resoln))]
-                except IndexError:
-                    continue
-                #------------Plot the results------------
-                if not args.noplot:
-                    try:
-                        plt.step(sp.wave, sp.fnu, color='b')
-                        plt.step(sp.wave, sp.fnu_u, color='gray')
-                        plt.plot(sp.wave, sp.fnu_autocont, color='k')
-                        if 'stack' not in shortlabel and 'esi' not in shortlabel:
-                            plt.step(sp.wave, sp.fnu_cont, color='y')
-                            plt.ylim(0, 1.2E-28)
-                        else:
-                            try:
-                                plt.ylim(ymin,ymax)
-                            except:
-                                pass
-                        plt.xlim(xmin, xmax)
-                    except:
-                        print 'failed at', shortlabel
-                        break
-                    plt.text(xmin+dx*0.05, ax1.get_ylim()[1]*0.8, 'Frame '+str(int(jj)+1))
-                if not args.fullmad:
-                    m.fit_some_EWs(line, sp, resoln, shortlabel, line_table, dresoln, sp_orig, args=args) #calling line fitter
-                if not args.noplot:
-                    ax2 = ax1.twiny()
-                    ax2.set_xlim(ax1.get_xlim())       
-                    ax2.set_xticklabels(np.round(np.divide(ax1.get_xticks(),(1.+zz_sys)),decimals=0))
-                    labels2 = [item.get_text() for item in ax2.get_xticklabels()]
-                    ax2.set_xticks(np.concatenate([ax2.get_xticks(), line.wave]))
-                    ax2.set_xlim(ax1.get_xlim())       
-                    ax2.set_xticklabels(np.concatenate([labels2,np.array(line.label.values).tolist()]), rotation = 45, ha='left', fontsize='small')
-                    if not args.see:
-                        fig.subplots_adjust(hspace=0.7, top=0.94, bottom=0.05, left=0.06, right=0.95)
+                    plt.step(sp.wave, sp.fnu, color='b')
+                    plt.step(sp.wave, sp.fnu_u, color='gray')
+                    plt.plot(sp.wave, sp.fnu_autocont, color='k')
+                    if 'stack' not in shortlabel and ('esi' not in shortlabel and 'new-format' not in shortlabel):
+                        plt.step(sp.wave, sp.fnu_cont, color='y')
+                        plt.ylim(0, 1.2E-28)
                     else:
-                        fig.subplots_adjust(hspace=0.7, top=0.8, bottom=0.1, left=0.07, right=0.95)
-                    fig.text(0.5, 0.02, 'Observed Wavelength (A)', ha='center')
-                    if not args.see: fig.text(0.02, 0.5, 'f_nu (ergs/s/cm^2/Hz)', va='center', rotation='vertical')
-                    else: fig.text(0.03, 0.5, 'f_nu (ergs/s/cm^2/Hz)', va='center', rotation='vertical')
-            if args.savepdf:
-                pdf.savefig(fig)
-            if not args.hide: plt.show(block=False)
+                        try:
+                            plt.ylim(ymin,ymax)
+                        except:
+                            pass
+                    plt.xlim(xmin, xmax)
+                except:
+                    print 'failed at', shortlabel
+                    break
+                plt.text(xmin+dx*0.05, ax1.get_ylim()[1]*0.8, 'Frame '+str(int(jj)+1))
+            if not args.fullmad:
+                m.fit_some_EWs(line, sp, resoln, shortlabel, line_table, dresoln, sp_orig, args=args) #calling line fitter
+            if not args.noplot:
+                ax2 = ax1.twiny()
+                ax2.set_xlim(ax1.get_xlim())       
+                ax2.set_xticklabels(np.round(np.divide(ax1.get_xticks(),(1.+zz_sys)),decimals=0))
+                labels2 = [item.get_text() for item in ax2.get_xticklabels()]
+                ax2.set_xticks(np.concatenate([ax2.get_xticks(), line.wave]))
+                ax2.set_xlim(ax1.get_xlim())       
+                ax2.set_xticklabels(np.concatenate([labels2,np.array(line.label.values).tolist()]), rotation = 45, ha='left', fontsize='small')
+                if not args.see:
+                    fig.subplots_adjust(hspace=0.7, top=0.94, bottom=0.05, left=0.06, right=0.95)
+                else:
+                    fig.subplots_adjust(hspace=0.7, top=0.8, bottom=0.1, left=0.07, right=0.95)
+                fig.text(0.5, 0.02, 'Observed Wavelength (A)', ha='center')
+                if not args.see: fig.text(0.02, 0.5, 'f_nu (ergs/s/cm^2/Hz)', va='center', rotation='vertical')
+                else: fig.text(0.03, 0.5, 'f_nu (ergs/s/cm^2/Hz)', va='center', rotation='vertical')
         if args.savepdf:
-            pdf.close()
-        #fig.savefig(name+'.png')
-    
+            pdf.savefig(fig)
+        if not args.hide: plt.show(block=False)
+    if args.savepdf:
+        pdf.close()
+    #fig.savefig(name+'.png')
+    '''
     except Exception, e:
         print 'Could not successfully complete', shortlabel, 'due to:'
-        print e
+        print e, 'in line', sys.exc_info()[-1].tb_lineno
         continue
-    
+    '''
 #------------changing data types------------------------------
 line_table.obs_wav = line_table.obs_wav.astype(np.float64)
 line_table.rest_wave = line_table.rest_wave.astype(np.float64)
@@ -405,7 +442,7 @@ elif listname == 'trial': #For correcting zz_sys: to check redshifts using only 
     short_table = line_table[['label', 'line_lab','rest_wave','EWr_fit','EWr_fit_u','EW_signi','zz','zz_u']]
     short_table.EW_signi = short_table.EW_signi.astype(np.float64)
     short_table = short_table[short_table.EW_signi > 3.] #taking out undetected lines
-    fout = '/Users/acharyya/Dropbox/MagE_atlas/Contrib/EWs/zz_list_few_galx.txt'
+    fout = HOME+'Dropbox/MagE_atlas/Contrib/EWs/zz_list_few_galx.txt'
     head = 'This file contains the measurements of lines in the MagE sample. Generated by EW_fitter.py.\n\
     Its for a few galaxies, using only bright emission lines, for the purpose of investigating the nebular redshifts.\n\
     Columns are:\n\
