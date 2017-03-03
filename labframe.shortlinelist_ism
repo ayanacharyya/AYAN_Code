@@ -1,9 +1,0 @@
-#New customised ISM linelist for getting right zz_ism
-#Columns are:
-LineID restwave type source
-
-CII1334   1334.5323   ISM   Prochaska
-SiII1526    1526.7066   ISM   Prochaska
-AlII1670  1670.7874   ISM   Prochaska
-AlIII1854   1854.7164     ISM   Prochaska
-AlIII1862   1862.7895     ISM   Prochaska
