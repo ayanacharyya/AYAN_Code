@@ -23,7 +23,10 @@ Usage: python EW_fitter.py --<options>
 --lines LINES ; LINES = 'emission' OR 'photospheric' depending on which lines you want to be fit, linelists can be 
                 found in files labframe.shortlinelist_emission and labframe.shortlinelist_photospheric, respectively.
                 default = emission
---fout FOUT ; FOUT = filename you want the output ASCII file to have, default = fitted_line_list.txt
+--fout FOUT ; FOUT = filename (only file name, excluding path, path can be set by --path option (see below)) you want the output \
+                ASCII file to have, you may or may not include .txt, the code automatically adds the extension if required, \
+                if FOUT is explicitly specified, output files are saved in PATH+FOUT
+                else, by default saved in current working directory as fitted_line_list.txt
 --spec_list_file FILENAME ; FILENAME = filename of the spectra list file you want to be used, instead of the usual spectra_redshift.txt
 --see LABEL ; LABEL = line label you want to check (string) if you want to see only the frame containing a relevant line \
                     and not the whole spectrum, default = None (shows all lines)
@@ -45,6 +48,17 @@ Usage: python EW_fitter.py --<options>
             MAD errors) on the resultant plot
 --fullmad ; boolean option, if present then calculate the MAD at every point on spectrum and add a column to dataframe
 --showerr ; boolean option, if present then plots the Schneider precription EWs with errors
+--extract ; LABEL = line label you want to extract (string), to plot for papers
+--spec_list_file FILENAME ; FILENAME = name of a file analogous to spectra-filenames-redshifts file, if you don't want to use \
+                the latter. Used only for spectrum files which have 'new-format' in their names, i.e. that are not the usual mage/esi spectra \
+                for usual mage spectra the code knows to use spectra-filenames-redshifts in Dropbox and \
+                for esi spectra (reduced by Ayan) the code knows to use the special version of spectra-filenames-redshifts file in /Users/acharyya/Desktop/mage/.
+--plotfnu ; boolean option, if present then plots theflux axis in fnu units instead of flambda
+--nrow NROW ; NROW = maximum number of rows to be sub-plotted in the the resulting plots/PDFs, default=4
+--ncol NCOL ; NCOL = maximum number of columns to be sub-plotted in the the resulting plots/PDFs, default=1
+--usefnucont COLFNUCONT ; COLFNUCONT = name of the column carrying continuum (in fnu units) to be used for line fitting, instead of default jrr.mage.auto_fit_cont
+--useflamcont COLFLAMCONT ; COLFLAMCONT = name of the column carrying continuum (in flam units) to be used for line fitting, instead of default jrr.mage.auto_fit_cont
+--path PATH ; PATH = full path of directory where resulting dataframe and PDFs would be saved, default is ~/Dropbox/MagE_atlas/Contrib/EWs/.
 '''
 import sys
 sys.path.append('../')
@@ -61,10 +75,11 @@ from matplotlib import pyplot as plt
 mage_mode = "released"
 import argparse as ap
 from matplotlib.backends.backend_pdf import PdfPages
-HOME ='/Users/acharyya/'
+import os
+HOME = os.getenv('HOME')+'/'
 #-----------Main function starts------------------
-path = HOME+'Dropbox/MagE_atlas/Contrib/EWs/' #directory to store the resulting output files
 parser = ap.ArgumentParser(description="Mage spectra fitting tool")
+parser.add_argument("--path")
 parser.add_argument("--shortlabel")
 parser.add_argument("--fcen")
 parser.add_argument("--fcon")
@@ -80,6 +95,10 @@ parser.add_argument("--fout")
 parser.add_argument("--see")
 parser.add_argument("--extract")
 parser.add_argument("--spec_list_file")
+parser.add_argument("--nrow")
+parser.add_argument("--ncol")
+parser.add_argument("--usefnucont")
+parser.add_argument("--useflamcont")
 parser.add_argument('--keepprev', dest='keepprev', action='store_true')
 parser.set_defaults(keepprev=False)
 parser.add_argument('--silent', dest='silent', action='store_true')
@@ -111,10 +130,22 @@ parser.set_defaults(showerr=False)
 parser.add_argument('--plotfnu', dest='plotfnu', action='store_true')
 parser.set_defaults(plotfnu=False)
 args, leftovers = parser.parse_known_args()
+if args.path is not None:
+    path = args.path
+else:
+    path = HOME+'Dropbox/MagE_atlas/Contrib/EWs/' #directory to store the resulting output files
 if args.dx is not None:
     dx = float(args.dx)
 else:
     dx = 310.
+if args.nrow is not None:
+    nrow = int(args.nrow)
+else:
+    nrow = 4
+if args.ncol is not None:
+    ncol = int(args.ncol)
+else:
+    ncol = 1
 if args.resoln is not None:
     resoln = float(args.resoln)
 else:
@@ -131,6 +162,14 @@ if args.frame is not None:
     frame = args.frame
 else:
     frame = None
+if args.usefnucont is not None:
+    colfnucont = args.usefnucont
+else:
+    colfnucont = ''
+if args.useflamcont is not None:
+    colflamcont = args.useflamcont
+else:
+    colflamcont = ''
 if args.shortlabel is not None:
     labels = [item for item in args.shortlabel.split(',')]
 else:
@@ -208,7 +247,8 @@ if args.allspec:
     ]
     fout = path + 'allspec_fitted_'+listname+'_linelist.txt'
 if args.fout is not None:
-    fout = str(args.fout)+'.txt'
+    fout = path + str(args.fout)
+    if not fout[-4:] == '.txt': fout += '.txt'
 elif 'fout' not in locals():
     fout = 'fitted_line_list.txt'
 if not args.keepprev:
@@ -261,8 +301,27 @@ for ii in range(0, len(specs)) :
         dresoln = 40.       # 
     else:
         (sp_orig, resoln, dresoln)  = jrr.mage.open_spectrum(filename, zz_sys, mage_mode)
-    #-----------fitting continuum----------------------------
-    m.fit_autocont(sp_orig, zz_sys, line_path,filename)
+    #-----------fitting continuum unless asked to use existing continuum column in spectrum dataframe----------------------------
+    if args.usefnucont is not None:
+        if colfnucont in sp_orig:
+            sp_orig.drop('fnu_autocont',1,inplace=True) #removing any pre-existing fnu_autocont column, as now we're going to create a new fnu_autocont column
+            sp_orig.rename(columns={colfnucont:'fnu_autocont'},inplace=True)
+            sp_orig['flam_autocont'] = jrr.spec.fnu2flam(sp_orig.wave, sp_orig.fnu_autocont)
+            print 'Using continuum values from', colfnucont, 'and NOT automaticalaly fitting continuum.'
+        else:
+            print 'Column', colfnucont, 'does not exist in', filename, '. Exiting..'
+            sys.exit()
+    elif args.useflamcont is not None:
+        if colflamcont in sp_orig:
+            sp_orig.drop('flam_autocont',1,inplace=True) #removing any pre-existing flam_autocont column, as now we're going to create a new flam_autocont column
+            sp_orig.rename(columns={colflamcont:'flam_autocont'},inplace=True)
+            sp_orig.fnu_autocont = jrr.spec.flam2fnu(sp_orig.wave, sp_orig.flam_autocont)   
+            print 'Using continuum values from', colflamcont, 'and NOT automaticalaly fitting continuum.'
+        else:
+            print 'Column', colflamcont, 'does not exist in', filename, '. Exiting..'
+            sys.exit()
+    else:
+        m.fit_autocont(sp_orig, zz_sys, line_path,filename)
     #-------masking sky lines-----------------
     if 'stack' not in shortlabel:
         if args.mymask:
@@ -279,15 +338,14 @@ for ii in range(0, len(specs)) :
     #sys.exit() #
     line_full = m.getlist('labframe.shortlinelist_'+listname, zz_dic, zz_err_dic)
     #------------Preparing to plot----------------------------------------
-    '''
+    
     if args.extract is not None:
         xmid = line_full[line_full.label == args.extract].wave.values[0]
         xstart = xmid -dx/2
         xlast = xmid + dx/2
     else:
-    '''
-    xstart = max(np.min(line_full.wave) - 50.,np.min(sp_orig.wave))
-    xlast = min(np.max(line_full.wave) + 50.,np.max(sp_orig.wave))
+        xstart = max(np.min(line_full.wave) - 50.,np.min(sp_orig.wave))
+        xlast = min(np.max(line_full.wave) + 50.,np.max(sp_orig.wave))
     if args.extract is not None:
         lines_to_extract = [item for item in args.extract.split(',')]
         n_arr = np.arange(len(lines_to_extract))
@@ -295,7 +353,8 @@ for ii in range(0, len(specs)) :
         n_arr = np.arange(int(np.ceil((xlast-xstart)/dx))).tolist()
     else:
         n_arr = [int(ar)-1 for ar in frame.split(',')] #Use this to display selected frame/s
-    name = path + listname+'/'+shortlabel+'-'+listname+'_fit'
+    if args.extract is None: name = path + listname+'/'+shortlabel+'-'+listname+'_fit'
+    else: name = path + listname+'/'+shortlabel+'-individual-lines_fit'
     if args.savepdf:
         pdf = PdfPages(name+'.pdf')
     #---------pre check in which frames lines are available if display_only_success = 1---------
@@ -318,11 +377,10 @@ for ii in range(0, len(specs)) :
             print 'None of the requested frames have any line in them. Try with a different frame number.'
             continue
     #------------------------------------------------------------
-    nrow = 4 if args.extract is None else 3 #maximum rows per page
-    ncol = 1 if args.extract is None else  2#maximum columns per page
     n_subplot = nrow*ncol
     
     n_subarr = np.split(n_arr,np.arange(n_subplot,n_subplot*len(n_arr)/n_subplot+1,n_subplot)) #np.array_split(n_arr, int(np.ceil(len(n_arr)/float(nrow*ncol))))
+    if len(n_subarr[-1]) == 0: n_subarr = n_subarr[:-1] #trimming last sub array if empty
     for ss in range(len(n_subarr)):
         n_arr = n_subarr[ss]
         n = len(n_arr)
@@ -348,8 +406,12 @@ for ii in range(0, len(specs)) :
                 if args.extract is None: ax1 = fig.add_subplot(n,1,fc+1)
                 else: ax1 = fig.add_subplot(nrow_actual,ncol_actual,fc+1)
             sp = sp_orig[sp_orig['wave'].between(xmin,xmax)]
-            ymin = min(0,np.min(sp.fnu_u)*0.98) #setting ylimits for plotting, to little lower than minimum value of the error
-            ymax = min(3,np.max(sp.fnu)*1.01) #little higher than maximum flux value
+            if not args.plotfnu:
+                ymin = min(0,np.min(sp.flam_u)*0.98) #setting ylimits for plotting, to little lower than minimum value of the error
+                ymax = min(3,np.max(sp.flam)*1.01) #little higher than maximum flux value
+            else:
+                ymin = min(0,np.min(sp.fnu_u)*0.98) #setting ylimits for plotting, to little lower than minimum value of the error
+                ymax = min(3,np.max(sp.fnu)*1.01) #little higher than maximum flux value
             try:
                 line = line_full[line_full['wave'].between(xmin*(1.+5./resoln), xmax*(1.-5./resoln))]
             except IndexError:
@@ -358,7 +420,8 @@ for ii in range(0, len(specs)) :
             if not args.noplot:
                 try:
                     if not args.plotfnu:
-                        plt.step(sp.wave, sp.flam, color='b')
+                        spec_color = 'b' if not args.extract else 'k'
+                        plt.step(sp.wave, sp.flam, color=spec_color)
                         plt.step(sp.wave, sp.flam_u, color='gray')
                         plt.plot(sp.wave, sp.flam_autocont, color='k')
                         if 'stack' not in shortlabel and ('esi' not in shortlabel and 'new-format' not in shortlabel):
@@ -371,7 +434,8 @@ for ii in range(0, len(specs)) :
                                 pass
                         if args.extract: plt.ylim(0,2e-17)
                     else:
-                        plt.step(sp.wave, sp.fnu, color='b')
+                        spec_color = 'b' if not args.extract else 'k'
+                        plt.step(sp.wave, sp.fnu, color=spec_color)
                         plt.step(sp.wave, sp.fnu_u, color='gray')
                         plt.plot(sp.wave, sp.fnu_autocont, color='k')
                         if 'stack' not in shortlabel and ('esi' not in shortlabel and 'new-format' not in shortlabel):
@@ -394,12 +458,6 @@ for ii in range(0, len(specs)) :
                 ax2 = ax1.twiny()
                 ax2.set_xlim(ax1.get_xlim())       
                 ax2.set_xticklabels(np.round(np.divide(ax1.get_xticks(),(1.+zz_sys)),decimals=0))
-                '''
-                labels2 = [item.get_text() for item in ax2.get_xticklabels()]
-                ax2.set_xticks(np.concatenate([ax2.get_xticks(), line.wave]))
-                ax2.set_xlim(ax1.get_xlim())       
-                ax2.set_xticklabels(np.concatenate([labels2,np.array(line.label.values).tolist()]), rotation = 45, ha='left', fontsize='small')
-                '''
         if not args.noplot:
             if args.see:
                 fig.subplots_adjust(hspace=0.7, top=0.8, bottom=0.15, left=0.05, right=0.98)
