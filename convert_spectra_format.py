@@ -7,12 +7,11 @@ import pandas as pd
 import sys
 import argparse as ap
 import os
-HOME = HOME ='/Users/acharyya/'
+HOME = os.getenv('HOME')+'/'
 #---------------------------------------------------------------- 
 def writespec_txt(spec, fout, z='', z_u='', filename=''):
     head = '#1D spectrum for object file '+filename+'\n\
-    #made using python convert_spectra_format.py\n\
-    #by Ayan, Mar 2017\n\
+    #made using python convert_spectra_format.py by Ayan, Mar 2017\n\
     redshift z = '+str(z)+'\n\
     redshift uncertainty z_u = '+str(z_u)+'\n'
     np.savetxt(fout, [], header=head, comments='#')
@@ -43,6 +42,7 @@ parser.add_argument("--wavecol")
 parser.add_argument("--flamcol")
 parser.add_argument("--flamucol")
 parser.add_argument("--flamconst")
+parser.add_argument("--flamcontcol")
 parser.add_argument("--z")
 parser.add_argument("--zu")
 args, leftovers = parser.parse_known_args()
@@ -55,7 +55,7 @@ if args.infile is not None:
     infile = args.infile
 else:
     infile = ''
-    print 'Must provide an input filename. Exiting.'
+    print 'Must provide an input filename as --infile <FILENAME-WITHOUT-PATH>. Exiting.'
     sys.exit()
 if args.wavecol is not None:
     wavecol = args.wavecol
@@ -69,6 +69,10 @@ if args.flamucol is not None:
     flamucol = args.flamucol
 else:
     flamucol = 'flam_u'
+if args.flamcontcol is not None:
+    flamcontcol = args.flamcontcol
+else:
+    flamcontcol = 'flam_cont'
 if args.flamconst is not None:
     flamconst = np.float(args.flamconst)
 else:
@@ -91,6 +95,10 @@ sp['flam'] = sp['flam']*flamconst
 sp['flam_u'] = sp['flam_u']*flamconst
 sp['restwave'] = sp['obswave']/(1+z)
 sp['badmask'] = False
+
+if flamcontcol in sp:
+    sp.rename(columns= {flamcontcol  : 'flam_cont'}, inplace=True)
+    sp['flam_cont'] = sp['flam_cont']*flamconst
 
 outfile = infile[:-4] + '_new-format.txt'
 writespec_txt(sp, inpath+outfile, z=z, z_u=zu, filename=inpath+infile)
