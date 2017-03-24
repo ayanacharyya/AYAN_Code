@@ -13,10 +13,11 @@ outfile = 'stacked_lineEW'
 galaxy = 'magestackbyneb'
 '''
 input_path = '/Users/acharyya/Documents/writings/papers/abundance_pap/' #'/Users/acharyya/Dropbox/MagE_atlas/Contrib/EWs/' #where is the dataframe resides
-infile = 'lineflux.txt'
+infile = 'lineflux_restUV.txt'
 output_path = '/Users/acharyya/Documents/writings/papers/abundance_pap/'
-outfile = 'lineflux_detected'
+outfile = 'lineflux_restUV_detected'
 galaxy = 'rcs0327-E'
+
 line_table = pd.read_table(input_path+infile, delim_whitespace=True, comment="#") #input dataframe file
 line_table = line_table[line_table['label'].eq(galaxy)]
 thresh = 3

@@ -78,6 +78,7 @@ parser.add_argument("--nbin")
 parser.add_argument("--lines")
 parser.add_argument("--fout")
 parser.add_argument("--see")
+parser.add_argument("--extract")
 parser.add_argument("--spec_list_file")
 parser.add_argument('--keepprev', dest='keepprev', action='store_true')
 parser.set_defaults(keepprev=False)
@@ -107,6 +108,8 @@ parser.add_argument('--fullmad', dest='fullmad', action='store_true')
 parser.set_defaults(fullmad=False)
 parser.add_argument('--showerr', dest='showerr', action='store_true')
 parser.set_defaults(showerr=False)
+parser.add_argument('--plotfnu', dest='plotfnu', action='store_true')
+parser.set_defaults(plotfnu=False)
 args, leftovers = parser.parse_known_args()
 if args.dx is not None:
     dx = float(args.dx)
@@ -276,9 +279,19 @@ for ii in range(0, len(specs)) :
     #sys.exit() #
     line_full = m.getlist('labframe.shortlinelist_'+listname, zz_dic, zz_err_dic)
     #------------Preparing to plot----------------------------------------
+    '''
+    if args.extract is not None:
+        xmid = line_full[line_full.label == args.extract].wave.values[0]
+        xstart = xmid -dx/2
+        xlast = xmid + dx/2
+    else:
+    '''
     xstart = max(np.min(line_full.wave) - 50.,np.min(sp_orig.wave))
     xlast = min(np.max(line_full.wave) + 50.,np.max(sp_orig.wave))
-    if frame is None:
+    if args.extract is not None:
+        lines_to_extract = [item for item in args.extract.split(',')]
+        n_arr = np.arange(len(lines_to_extract))
+    elif frame is None:
         n_arr = np.arange(int(np.ceil((xlast-xstart)/dx))).tolist()
     else:
         n_arr = [int(ar)-1 for ar in frame.split(',')] #Use this to display selected frame/s
@@ -287,7 +300,7 @@ for ii in range(0, len(specs)) :
         pdf = PdfPages(name+'.pdf')
     #---------pre check in which frames lines are available if display_only_success = 1---------
     #---------------------------just a visualisation thing-----------------------------------
-    if display_only_success:
+    if display_only_success and args.extract is None:
         for jj in range(len(n_arr)):
             xmin = xstart + n_arr[jj]*dx
             xmax = min(xmin + dx, xlast)
@@ -305,21 +318,35 @@ for ii in range(0, len(specs)) :
             print 'None of the requested frames have any line in them. Try with a different frame number.'
             continue
     #------------------------------------------------------------
-    nrow = 4 #maximum frames per page
-    n_subarr = np.array_split(n_arr, int(np.ceil(len(n_arr)/float(nrow))))
+    nrow = 4 if args.extract is None else 3 #maximum rows per page
+    ncol = 1 if args.extract is None else  2#maximum columns per page
+    n_subplot = nrow*ncol
+    
+    n_subarr = np.split(n_arr,np.arange(n_subplot,n_subplot*len(n_arr)/n_subplot+1,n_subplot)) #np.array_split(n_arr, int(np.ceil(len(n_arr)/float(nrow*ncol))))
     for ss in range(len(n_subarr)):
         n_arr = n_subarr[ss]
         n = len(n_arr)
+        nrow_actual = int(np.ceil(n/float(ncol)))
+        ncol_actual = min(n,ncol)
         if not args.noplot:
-            fig = plt.figure(figsize=(18+10/(n+1),(12 if n > 2 else n*3)))
+            if args.extract:
+                fig = plt.figure(figsize=(6+1*ncol_actual,5+1*nrow_actual))
+            else:
+                fig = plt.figure(figsize=(18+10/(n+1),(12 if n > 2 else n*3)))
             #fig = plt.figure(figsize=(14+8/(n+1),(9 if n > 2 else n*3)))
-            if not args.see: plt.title(shortlabel + "  z=" + str(zz_sys)+'.\n Vertical lines legend: Blue=initial guess of center,'+\
+            if not args.see and not args.extract: plt.title(shortlabel + "  z=" + str(zz_sys)+'.\n Vertical lines legend: Blue=initial guess of center,'+\
             ' Red=fitted center, Black=no detection(upper limit)', y=1.02)
         for fc, jj in enumerate(n_arr):
-            xmin = xstart + jj*dx
-            xmax = min(xmin + dx, xlast)
+            if args.extract is not None:
+                xmid = line_full[line_full.label == lines_to_extract[fc]].wave.values[0]
+                xmin = xmid - dx/2
+                xmax = xmid + dx/2
+            else:
+                xmin = xstart + jj*dx
+                xmax = min(xmin + dx, xlast)
             if not args.noplot:
-                ax1 = fig.add_subplot(n,1,fc+1)
+                if args.extract is None: ax1 = fig.add_subplot(n,1,fc+1)
+                else: ax1 = fig.add_subplot(nrow_actual,ncol_actual,fc+1)
             sp = sp_orig[sp_orig['wave'].between(xmin,xmax)]
             ymin = min(0,np.min(sp.fnu_u)*0.98) #setting ylimits for plotting, to little lower than minimum value of the error
             ymax = min(3,np.max(sp.fnu)*1.01) #little higher than maximum flux value
@@ -330,39 +357,60 @@ for ii in range(0, len(specs)) :
             #------------Plot the results------------
             if not args.noplot:
                 try:
-                    plt.step(sp.wave, sp.fnu, color='b')
-                    plt.step(sp.wave, sp.fnu_u, color='gray')
-                    plt.plot(sp.wave, sp.fnu_autocont, color='k')
-                    if 'stack' not in shortlabel and ('esi' not in shortlabel and 'new-format' not in shortlabel):
-                        plt.step(sp.wave, sp.fnu_cont, color='y')
-                        plt.ylim(0, 1.2E-28)
+                    if not args.plotfnu:
+                        plt.step(sp.wave, sp.flam, color='b')
+                        plt.step(sp.wave, sp.flam_u, color='gray')
+                        plt.plot(sp.wave, sp.flam_autocont, color='k')
+                        if 'stack' not in shortlabel and ('esi' not in shortlabel and 'new-format' not in shortlabel):
+                            plt.step(sp.wave, sp.flam_cont, color='y')
+                            plt.ylim(0, 2E-17)
+                        else:
+                            try:
+                                plt.ylim(ymin,ymax)
+                            except:
+                                pass
+                        if args.extract: plt.ylim(0,2e-17)
                     else:
-                        try:
-                            plt.ylim(ymin,ymax)
-                        except:
-                            pass
+                        plt.step(sp.wave, sp.fnu, color='b')
+                        plt.step(sp.wave, sp.fnu_u, color='gray')
+                        plt.plot(sp.wave, sp.fnu_autocont, color='k')
+                        if 'stack' not in shortlabel and ('esi' not in shortlabel and 'new-format' not in shortlabel):
+                            plt.step(sp.wave, sp.fnu_cont, color='y')
+                            plt.ylim(0, 1.2E-28)
+                        else:
+                            try:
+                                plt.ylim(ymin,ymax)
+                            except:
+                                pass
+                        if args.extract: plt.ylim(0,0.8e-28)
                     plt.xlim(xmin, xmax)
                 except:
                     print 'failed at', shortlabel
                     break
-                plt.text(xmin+dx*0.05, ax1.get_ylim()[1]*0.8, 'Frame '+str(int(jj)+1))
+                if not args.extract: plt.text(xmin+dx*0.005, ax1.get_ylim()[1]*0.9, 'Frame '+str(int(jj)+1))
             if not args.fullmad:
                 m.fit_some_EWs(line, sp, resoln, shortlabel, line_table, dresoln, sp_orig, args=args) #calling line fitter
             if not args.noplot:
                 ax2 = ax1.twiny()
                 ax2.set_xlim(ax1.get_xlim())       
                 ax2.set_xticklabels(np.round(np.divide(ax1.get_xticks(),(1.+zz_sys)),decimals=0))
+                '''
                 labels2 = [item.get_text() for item in ax2.get_xticklabels()]
                 ax2.set_xticks(np.concatenate([ax2.get_xticks(), line.wave]))
                 ax2.set_xlim(ax1.get_xlim())       
                 ax2.set_xticklabels(np.concatenate([labels2,np.array(line.label.values).tolist()]), rotation = 45, ha='left', fontsize='small')
-                if not args.see:
-                    fig.subplots_adjust(hspace=0.7, top=0.94, bottom=0.05, left=0.06, right=0.95)
-                else:
-                    fig.subplots_adjust(hspace=0.7, top=0.8, bottom=0.1, left=0.07, right=0.95)
-                fig.text(0.5, 0.02, 'Observed Wavelength (A)', ha='center')
-                if not args.see: fig.text(0.02, 0.5, 'f_nu (ergs/s/cm^2/Hz)', va='center', rotation='vertical')
-                else: fig.text(0.03, 0.5, 'f_nu (ergs/s/cm^2/Hz)', va='center', rotation='vertical')
+                '''
+        if not args.noplot:
+            if args.see:
+                fig.subplots_adjust(hspace=0.7, top=0.8, bottom=0.15, left=0.05, right=0.98)
+            elif args.extract:
+                fig.subplots_adjust(hspace=0.4, top=0.90, bottom=0.10, left=0.10, right=0.95)
+            else:
+                fig.subplots_adjust(hspace=0.7, top=0.94, bottom=0.05, left=0.06, right=0.95)
+            fig.text(0.5, 0.02, 'Observed Wavelength (A)', ha='center')
+            fig.text(0.5, 0.96, 'Rest-frame Wavelength (A)', ha='center')
+            if not args.plotfnu: fig.text(0.02, 0.5, 'f_lam (ergs/s/cm^2/A)', va='center', rotation='vertical')
+            else: fig.text(0.02, 0.5, 'f_nu (ergs/s/cm^2/Hz)', va='center', rotation='vertical')
         if args.savepdf:
             pdf.savefig(fig)
         if not args.hide: plt.show(block=False)
@@ -397,12 +445,12 @@ line_table.EW_signi=line_table.EW_signi.astype(np.float64)
 line_table.f_signi=line_table.f_signi.astype(np.float64)
 if shortlabel == 'rcs0327-E':
     print 'Extinction available for rcs0327-E. Performing redenning correction...'
-    E, E_u = 0.2, 0.1
+    E, E_u = 0.4, 0.07 #extinction from Whitaker et al. 2014
     line_table['f_redcor'],line_table['f_redcor_u']=m.extinct(line_table.rest_wave, line_table.f_line, line_table.f_line_u, E, E_u)
     line_table['f_Suplim_redcor'],dummy=m.extinct(line_table.rest_wave, line_table.f_Suplim, line_table.f_line_u, E, E_u)
-    line_table['f_redcor']=line_table['f_redcor'].map('{:,.3e}'.format)
-    line_table['f_redcor_u']=line_table['f_redcor_u'].map('{:,.3e}'.format)
-    line_table['f_Suplim_redcor']=line_table['f_Suplim_redcor'].map('{:,.3e}'.format)
+    line_table['f_redcor']=line_table['f_redcor'].map('{:.3e}'.format)
+    line_table['f_redcor_u']=line_table['f_redcor_u'].map('{:.3e}'.format)
+    line_table['f_Suplim_redcor']=line_table['f_Suplim_redcor'].map('{:.3e}'.format)
 #----------------Saving dataframe to ASCII file--------------------------------------------
 head = 'This file contains the measurements of lines in the MagE sample. Generated by EW_fitter.py.\n\
 Columns are:\n\
