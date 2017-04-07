@@ -48,7 +48,7 @@ Usage: python EW_fitter.py --<options>
             MAD errors) on the resultant plot
 --fullmad ; boolean option, if present then calculate the MAD at every point on spectrum and add a column to dataframe
 --showerr ; boolean option, if present then plots the Schneider precription EWs with errors
---extract ; LABEL = line label you want to extract (string), to plot for papers
+--extract LABEL; LABEL = line label you want to extract (string), to plot for papers
 --spec_list_file FILENAME ; FILENAME = name of a file analogous to spectra-filenames-redshifts file, if you don't want to use \
                 the latter. Used only for spectrum files which have 'new-format' in their names, i.e. that are not the usual mage/esi spectra \
                 for usual mage spectra the code knows to use spectra-filenames-redshifts in Dropbox and \
@@ -303,6 +303,8 @@ for ii in range(0, len(specs)) :
         (sp_orig, resoln, dresoln)  = jrr.mage.open_spectrum(filename, zz_sys, mage_mode)
     #-----------fitting continuum unless asked to use existing continuum column in spectrum dataframe----------------------------
     if args.usefnucont is not None:
+        #print sp_orig.info() #
+        #sys.exit() #
         if colfnucont in sp_orig:
             sp_orig.drop('fnu_autocont',1,inplace=True) #removing any pre-existing fnu_autocont column, as now we're going to create a new fnu_autocont column
             sp_orig.rename(columns={colfnucont:'fnu_autocont'},inplace=True)
@@ -340,14 +342,14 @@ for ii in range(0, len(specs)) :
     #------------Preparing to plot----------------------------------------
     
     if args.extract is not None:
-        xmid = line_full[line_full.label == args.extract].wave.values[0]
-        xstart = xmid -dx/2
-        xlast = xmid + dx/2
+        lines_to_extract = [item for item in args.extract.split(',')]
+        xmid = [line_full[line_full.label == item].wave.values[0] for item in lines_to_extract]
+        xstart = xmid[0] -dx/2
+        xlast = xmid[-1] + dx/2
     else:
         xstart = max(np.min(line_full.wave) - 50.,np.min(sp_orig.wave))
         xlast = min(np.max(line_full.wave) + 50.,np.max(sp_orig.wave))
     if args.extract is not None:
-        lines_to_extract = [item for item in args.extract.split(',')]
         n_arr = np.arange(len(lines_to_extract))
     elif frame is None:
         n_arr = np.arange(int(np.ceil((xlast-xstart)/dx))).tolist()
@@ -419,6 +421,8 @@ for ii in range(0, len(specs)) :
             #------------Plot the results------------
             if not args.noplot:
                 try:
+                    max_xticks = 3
+                    tick_size = 10
                     if not args.plotfnu:
                         spec_color = 'b' if not args.extract else 'k'
                         plt.step(sp.wave, sp.flam, color=spec_color)
@@ -432,7 +436,8 @@ for ii in range(0, len(specs)) :
                                 plt.ylim(ymin,ymax)
                             except:
                                 pass
-                        if args.extract: plt.ylim(0,2e-17)
+                        if args.extract: 
+                            plt.ylim(0,2e-17)
                     else:
                         spec_color = 'b' if not args.extract else 'k'
                         plt.step(sp.wave, sp.fnu, color=spec_color)
@@ -446,8 +451,12 @@ for ii in range(0, len(specs)) :
                                 plt.ylim(ymin,ymax)
                             except:
                                 pass
-                        if args.extract: plt.ylim(0,0.8e-28)
+                        if args.extract:
+                            plt.ylim(0,0.8e-28)
                     plt.xlim(xmin, xmax)
+                    if args.extract:
+                        ax1.set_xticks(np.round(np.arange(xmin+dx/(max_xticks+1),xmax,dx/(max_xticks+1))))
+                        ax1.tick_params(axis='x', labelsize=tick_size)
                 except:
                     print 'failed at', shortlabel
                     break
@@ -456,8 +465,11 @@ for ii in range(0, len(specs)) :
                 m.fit_some_EWs(line, sp, resoln, shortlabel, line_table, dresoln, sp_orig, args=args) #calling line fitter
             if not args.noplot:
                 ax2 = ax1.twiny()
-                ax2.set_xlim(ax1.get_xlim())       
-                ax2.set_xticklabels(np.round(np.divide(ax1.get_xticks(),(1.+zz_sys)),decimals=0))
+                ax2.set_xlim(ax1.get_xlim())
+                if args.extract is not None: 
+                    ax2.set_xticks(ax1.get_xticks()[1:])
+                    ax2.tick_params(axis='x', labelsize=tick_size)
+                ax2.set_xticklabels(np.round(ax2.get_xticks()/(1.+zz_sys)))
         if not args.noplot:
             if args.see:
                 fig.subplots_adjust(hspace=0.7, top=0.8, bottom=0.15, left=0.05, right=0.98)
