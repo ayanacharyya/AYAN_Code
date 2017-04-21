@@ -117,6 +117,8 @@ parser.add_argument('--stackbystars', dest='stackbystars', action='store_true')
 parser.set_defaults(stackbystars=False)
 parser.add_argument('--savepdf', dest='savepdf', action='store_true')
 parser.set_defaults(savepdf=False)
+parser.add_argument('--savepng', dest='savepng', action='store_true')
+parser.set_defaults(savepng=False)
 parser.add_argument('--hide', dest='hide', action='store_true')
 parser.set_defaults(hide=False)
 parser.add_argument('--noplot', dest='noplot', action='store_true')
@@ -133,7 +135,7 @@ args, leftovers = parser.parse_known_args()
 if args.path is not None:
     path = args.path
 else:
-    path = HOME+'Dropbox/MagE_atlas/Contrib/EWs/' #directory to store the resulting output files
+    path = HOME+'Dropbox/MagE_atlas/Contrib/EWs/emission/' #directory to store the resulting output files
 if args.dx is not None:
     dx = float(args.dx)
 else:
@@ -296,7 +298,7 @@ for ii in range(0, len(specs)) :
         specdir = specs['origdir'][ii]
         sp_orig = m.open_esi_spectrum(specdir+filename, getclean=True) # open_esi_spectrum() can open any other spectra as well, if the other spectra has been converted to desired format
     elif 'stack'in shortlabel:
-        sp_orig = jrr.mage.open_stacked_spectrum(mage_mode, alt_infile=filename) # alt_infile= Put the filename of the stacked spectrum file here
+        (sp_orig, LL_dummy) = jrr.mage.open_stacked_spectrum(mage_mode, alt_infile=filename) # alt_infile= Put the filename of the stacked spectrum file here
         resoln = 3e5/200.   # vel resol of 200km/s from file /Users/acharyya/Dropbox/mage_atlas/Contrib/S99/stack-A-sb99-fit.txt
         dresoln = 40.       # 
     else:
@@ -355,8 +357,8 @@ for ii in range(0, len(specs)) :
         n_arr = np.arange(int(np.ceil((xlast-xstart)/dx))).tolist()
     else:
         n_arr = [int(ar)-1 for ar in frame.split(',')] #Use this to display selected frame/s
-    if args.extract is None: name = path + listname+'/'+shortlabel+'-'+listname+'_fit'
-    else: name = path + listname+'/'+shortlabel+'-individual-lines_fit'
+    if args.extract: name = path + shortlabel+'-individual-lines_fit-'+args.extract
+    else: name = path + shortlabel+'-'+listname+'_fit'
     if args.savepdf:
         pdf = PdfPages(name+'.pdf')
     #---------pre check in which frames lines are available if display_only_success = 1---------
@@ -391,6 +393,8 @@ for ii in range(0, len(specs)) :
         if not args.noplot:
             if args.extract:
                 fig = plt.figure(figsize=(6+1*ncol_actual,5+1*nrow_actual))
+            elif args.savepng:
+                fig = plt.figure(figsize=(18+10/(n+1),(12 if n > 2 else n*6)))
             else:
                 fig = plt.figure(figsize=(18+10/(n+1),(12 if n > 2 else n*3)))
             #fig = plt.figure(figsize=(14+8/(n+1),(9 if n > 2 else n*3)))
@@ -410,7 +414,7 @@ for ii in range(0, len(specs)) :
             sp = sp_orig[sp_orig['wave'].between(xmin,xmax)]
             if not args.plotfnu:
                 ymin = min(0,np.min(sp.flam_u)*0.98) #setting ylimits for plotting, to little lower than minimum value of the error
-                ymax = min(3,np.max(sp.flam)*1.01) #little higher than maximum flux value
+                ymax = max(3,np.max(sp.flam)*1.01) #little higher than maximum flux value
             else:
                 ymin = min(0,np.min(sp.fnu_u)*0.98) #setting ylimits for plotting, to little lower than minimum value of the error
                 ymax = min(3,np.max(sp.fnu)*1.01) #little higher than maximum flux value
@@ -424,13 +428,13 @@ for ii in range(0, len(specs)) :
                     max_xticks = 3
                     tick_size = 10
                     if not args.plotfnu:
-                        spec_color = 'b' if not args.extract else 'k'
+                        spec_color = 'k'
                         plt.step(sp.wave, sp.flam, color=spec_color)
                         plt.step(sp.wave, sp.flam_u, color='gray')
-                        plt.plot(sp.wave, sp.flam_autocont, color='k')
-                        if 'stack' not in shortlabel and ('esi' not in shortlabel and 'new-format' not in shortlabel):
-                            plt.step(sp.wave, sp.flam_cont, color='y')
-                            plt.ylim(0, 2E-17)
+                        plt.plot(sp.wave, sp.flam_autocont, color='y')
+                        if ('stack' not in shortlabel and not args.savepng) and ('esi' not in shortlabel and 'new-format' not in shortlabel):
+                            plt.step(sp.wave, sp.flam_cont, color='b')
+                            plt.ylim(0, 1E-17)
                         else:
                             try:
                                 plt.ylim(ymin,ymax)
@@ -439,12 +443,12 @@ for ii in range(0, len(specs)) :
                         if args.extract: 
                             plt.ylim(0,2e-17)
                     else:
-                        spec_color = 'b' if not args.extract else 'k'
+                        spec_color = 'k'
                         plt.step(sp.wave, sp.fnu, color=spec_color)
                         plt.step(sp.wave, sp.fnu_u, color='gray')
-                        plt.plot(sp.wave, sp.fnu_autocont, color='k')
-                        if 'stack' not in shortlabel and ('esi' not in shortlabel and 'new-format' not in shortlabel):
-                            plt.step(sp.wave, sp.fnu_cont, color='y')
+                        plt.plot(sp.wave, sp.fnu_autocont, color='y')
+                        if ('stack' not in shortlabel and not args.savepng) and ('esi' not in shortlabel and 'new-format' not in shortlabel):
+                            plt.step(sp.wave, sp.fnu_cont, color='b')
                             plt.ylim(0, 1.2E-28)
                         else:
                             try:
@@ -460,15 +464,17 @@ for ii in range(0, len(specs)) :
                 except:
                     print 'failed at', shortlabel
                     break
-                if not args.extract: plt.text(xmin+dx*0.005, ax1.get_ylim()[1]*0.9, 'Frame '+str(int(jj)+1))
+                if not args.extract and not args.savepng: plt.text(xmin+dx*0.005, ax1.get_ylim()[1]*0.9, 'Frame '+str(int(jj)+1))
             if not args.fullmad:
                 m.fit_some_EWs(line, sp, resoln, shortlabel, line_table, dresoln, sp_orig, args=args) #calling line fitter
             if not args.noplot:
                 ax2 = ax1.twiny()
                 ax2.set_xlim(ax1.get_xlim())
-                if args.extract is not None: 
+                if args.extract: 
                     ax2.set_xticks(ax1.get_xticks()[1:])
                     ax2.tick_params(axis='x', labelsize=tick_size)
+                elif args.savepng:
+                    ax2.set_xticks(ax2.get_xticks()[2:])
                 ax2.set_xticklabels(np.round(ax2.get_xticks()/(1.+zz_sys)))
         if not args.noplot:
             if args.see:
@@ -477,16 +483,15 @@ for ii in range(0, len(specs)) :
                 fig.subplots_adjust(hspace=0.4, top=0.90, bottom=0.10, left=0.10, right=0.95)
             else:
                 fig.subplots_adjust(hspace=0.7, top=0.94, bottom=0.05, left=0.06, right=0.95)
-            fig.text(0.5, 0.02, 'Observed Wavelength (A)', ha='center')
-            fig.text(0.5, 0.96, 'Rest-frame Wavelength (A)', ha='center')
-            if not args.plotfnu: fig.text(0.02, 0.5, 'f_lam (ergs/s/cm^2/A)', va='center', rotation='vertical')
-            else: fig.text(0.02, 0.5, 'f_nu (ergs/s/cm^2/Hz)', va='center', rotation='vertical')
-        if args.savepdf:
-            pdf.savefig(fig)
+            fig.text(0.5, 0.02, r'Observed Wavelength (${\AA}$)', ha='center')
+            fig.text(0.5, 0.96, r'Rest-frame Wavelength (${\AA}$)', ha='center')
+            if not args.plotfnu: fig.text(0.02, 0.5, r'$f_\lambda$ (ergs/s/$cm^2/{\AA}$)', va='center', rotation='vertical')
+            else: fig.text(0.02, 0.5, r'$f_\nu$ (ergs/s/$cm^2$/Hz)', va='center', rotation='vertical')
+        if args.savepdf: pdf.savefig(fig)
+        if args.savepng: fig.savefig(name+'.png')
         if not args.hide: plt.show(block=False)
     if args.savepdf:
         pdf.close()
-    #fig.savefig(name+'.png')
     '''
     except Exception, e:
         print 'Could not successfully complete', shortlabel, 'due to:'
