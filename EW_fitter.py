@@ -358,7 +358,11 @@ for ii in range(0, len(specs)) :
         #------calculating the EW limits at every point following Schneider et al. 1993---------
         m.calc_schneider_EW(sp_orig, resoln, plotit=args.showerr)
         line_full = m.getlist(linelistpath+'labframe.shortlinelist_'+listname, zz_dic, zz_err_dic) #reading the linelist to be used for fittting
-        line_interven = m.get_interven_list(linelistpath+'labframe.shortlinelist_interven', zz_err = 0.0004) #reading the intervenning linelist
+        if os.path.exists(linelistpath+'labframe.shortlinelist_interven'):
+            line_interven = m.get_interven_list(linelistpath+'labframe.shortlinelist_interven', zz_err = 0.0004) #reading the intervenning linelist
+            print 'Inclusing intervenning linelist from', linelistpath+'labframe.shortlinelist_interven'
+        else:
+            line_interven = pd.DataFrame()
         if 'stack' not in shortlabel: line_full = pd.concat([line_full, line_interven], ignore_index=True) #appending the intervenning linelist to emission linelist
         line_full.sort_values('wave', inplace=True)
         #------------Preparing to plot----------------------------------------
