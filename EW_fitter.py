@@ -62,6 +62,7 @@ Usage: python EW_fitter.py --<options>
 --path PATH ; PATH = full path of directory where resulting dataframe and PDFs would be saved, default is ~/Dropbox/MagE_atlas/Contrib/EWs/.
 --nodered ; boolean option, if present then does not perform dereddening corrections
 --nofit ; boolean option, if present then plots only the spectra, does not fit the lines
+--linelistpath LINELISTPATH ; LINELISTPATH=path to labframe.shortlinelist_emission or labframe.shortlinelist_photospheric
 '''
 import sys
 sys.path.append('../')
@@ -104,6 +105,7 @@ parser.add_argument("--nrow")
 parser.add_argument("--ncol")
 parser.add_argument("--usefnucont")
 parser.add_argument("--useflamcont")
+parser.add_argument("--linelistpath")
 parser.add_argument('--keepprev', dest='keepprev', action='store_true')
 parser.set_defaults(keepprev=False)
 parser.add_argument('--silent', dest='silent', action='store_true')
@@ -183,6 +185,10 @@ if args.useflamcont is not None:
     colflamcont = args.useflamcont
 else:
     colflamcont = ''
+if args.linelistpath is not None:
+    linelistpath = args.linelistpath
+else:
+    linelistpath = ''
 if args.shortlabel is not None:
     labels = [item for item in args.shortlabel.split(',')]
 else:
@@ -351,8 +357,8 @@ for ii in range(0, len(specs)) :
             continue
         #------calculating the EW limits at every point following Schneider et al. 1993---------
         m.calc_schneider_EW(sp_orig, resoln, plotit=args.showerr)
-        line_full = m.getlist('labframe.shortlinelist_'+listname, zz_dic, zz_err_dic) #reading the linelist to be used for fittting
-        line_interven = m.get_interven_list('labframe.shortlinelist_interven', zz_err = 0.0004) #reading the intervenning linelist
+        line_full = m.getlist(linelistpath+'labframe.shortlinelist_'+listname, zz_dic, zz_err_dic) #reading the linelist to be used for fittting
+        line_interven = m.get_interven_list(linelistpath+'labframe.shortlinelist_interven', zz_err = 0.0004) #reading the intervenning linelist
         if 'stack' not in shortlabel: line_full = pd.concat([line_full, line_interven], ignore_index=True) #appending the intervenning linelist to emission linelist
         line_full.sort_values('wave', inplace=True)
         #------------Preparing to plot----------------------------------------
