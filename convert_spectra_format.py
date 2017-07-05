@@ -22,16 +22,26 @@ def writespeclist_txt(fout, specdir, shortlabel, z, z_u):
     if not os.path.exists(fout):
         head = '#Spectra: listed in the same format as individual ones for ease of being read by the code jrr.mage.getlist_labels()\n\
 #Columns:\n\
-#1)    spectrum filename  (path is /Users/acharyya/Dropbox/MagE_atlas/Contrib/ESI_Spectra/Temp/  )\n\
-#2)   short object name\n\
-#3-5)   Redshift of stars,  uncertainty, flag: same as nebular redshift\n\
-#6-8) Redshift of NEBULAR GAS,  uncertainty, flag\n\
-#9-11)Redshift of ISM, uncertainty, flag.  May be centroid since broad: same as nebular redshift\n\
-#12  Notes\n\
+#1) spectrum directory \n\
+#2)    spectrum filename \n\
+#3)   short object name\n\
+#4-6)   Redshift of stars,  uncertainty, flag: same as nebular redshift\n\
+#7-9) Redshift of NEBULAR GAS,  uncertainty, flag\n\
+#10-12)Redshift of ISM, uncertainty, flag.  May be centroid since broad: same as nebular redshift\n\
+#13  Notes\n\
 origdir\t\tfilename\t\tshort_label\t\tz_stars\t\tsig_st\t\tfl_st\t\tz_neb\t\tsig_neb\t\tfl_neb\t\tz_ISM\t\tsig_ISM\t\tfl_ISM\t\tNOTES\n'
         np.savetxt(fout, [], header=head, comments='')
-    with open(fout, 'a') as f:
-        np.savetxt(f, np.column_stack([specdir, shortlabel+'.txt', shortlabel, z, z_u, 0., z, z_u, 0., z, z_u, 0., 'converted-format']),"%s")
+    written = 0
+    string_to_write = specdir+' '+shortlabel+'.txt'+' '+shortlabel+' '+str(z)+' '+str(z_u)+' '+str(0.)+' '+str(z)+' '+str(z_u)+' '+\
+            str(0.)+' '+str(z)+' '+str(z_u)+' '+str(0.)+' '+'converted-format'+'\n'
+    with open(fout, 'r') as f: data = f.readlines()
+    for ind in range(len(data)):
+        if shortlabel in data[ind]:
+            data[ind] = string_to_write
+            written = 1
+    if not written:
+        data.append(string_to_write)
+    with open(fout, 'w') as f: f.writelines(data)
     print 'Written speclist to file ', fout
 #---------------------------------------------------------------- 
 #---------------------------------------------------------------- 
@@ -86,19 +96,15 @@ if args.zu is not None:
 else:
     zu = 0.0
 
-sp =  pd.read_table(inpath+infile, delim_whitespace=True, comment="#", header=0)
-sp.rename(columns= {wavecol  : 'obswave'}, inplace=True)
-sp.rename(columns= {flamcol  : 'flam'}, inplace=True)
-sp.rename(columns= {flamucol  : 'flam_u'}, inplace=True)
-
-sp['flam'] = sp['flam']*flamconst
-sp['flam_u'] = sp['flam_u']*flamconst
+sp_inp =  pd.read_table(inpath+infile, delim_whitespace=True, comment="#", header=0)
+sp = pd.DataFrame()
+sp['obswave'] = sp_inp[wavecol]
+sp['flam'] = sp_inp[flamcol]*flamconst
+sp['flam_u'] = sp_inp[flamucol]*flamconst
 sp['restwave'] = sp['obswave']/(1+z)
 sp['badmask'] = False
 
-if flamcontcol in sp:
-    sp.rename(columns= {flamcontcol  : 'flam_cont'}, inplace=True)
-    sp['flam_cont'] = sp['flam_cont']*flamconst
+if flamcontcol in sp_inp: sp['flam_cont'] = sp_inp[flamcontcol]*flamconst
 
 outfile = infile[:-4] + '_new-format.txt'
 writespec_txt(sp, inpath+outfile, z=z, z_u=zu, filename=inpath+infile)
