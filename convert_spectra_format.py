@@ -7,7 +7,7 @@ import pandas as pd
 import sys
 import argparse as ap
 import os
-HOME = os.getenv('HOME')+'/'
+HOME = os.getenv('HOME')
 #---------------------------------------------------------------- 
 def writespec_txt(spec, fout, z='', z_u='', filename=''):
     head = '#1D spectrum for object file '+filename+'\n\
@@ -60,7 +60,8 @@ args, leftovers = parser.parse_known_args()
 if args.inpath is not None:
     inpath = args.inpath
 else:
-    inpath = HOME+'Dropbox/MagE_atlas/Contrib/Temp/'
+    inpath = '~/Dropbox/MagE_atlas/Contrib/Temp/'
+if HOME in inpath: inpath=inpath.replace(HOME,'~')
 if args.infile is not None:
     infile = args.infile
 else:
@@ -107,6 +108,6 @@ sp['badmask'] = False
 if flamcontcol in sp_inp: sp['flam_cont'] = sp_inp[flamcontcol]*flamconst
 
 outfile = infile[:-4] + '_new-format.txt'
-writespec_txt(sp, inpath+outfile, z=z, z_u=zu, filename=inpath+infile)
-writespeclist_txt(inpath+'other-spectra-filenames-redshifts.txt', inpath, outfile[:-4], z, zu)
+writespec_txt(sp, os.path.expanduser(inpath)+outfile, z=z, z_u=zu, filename=inpath+infile)
+writespeclist_txt(os.path.expanduser(inpath)+'other-spectra-filenames-redshifts.txt', inpath, outfile[:-4], z, zu)
 print 'All Done!'

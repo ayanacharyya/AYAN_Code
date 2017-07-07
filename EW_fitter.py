@@ -316,7 +316,7 @@ for ii in range(0, len(specs)) :
         resoln = 4000.   # ESI spectral resoln for 1" slit
         dresoln = 40.    #         
     elif 'new-format' in shortlabel:
-        specdir = specs['origdir'][ii]
+        specdir = os.path.expanduser(specs['origdir'][ii])
         sp_orig = m.open_esi_spectrum(specdir+filename, getclean=True) # open_esi_spectrum() can open any other spectra as well, if the other spectra has been converted to desired format
     elif 'stack'in shortlabel:
         (sp_orig, LL_dummy) = jrr.mage.open_stacked_spectrum(mage_mode, alt_infile=filename) # alt_infile= Put the filename of the stacked spectrum file here
@@ -647,5 +647,5 @@ if args.makelatex:
     print 'List of spec', labels
     for lab in labels:
         print 'Converting df to tex for spec', lab
-        subprocess.call(['python /Users/acharyya/Documents/writings/papers/abundance_pap/dftolatex.py --infile '+fout+\
-    ' --outfile /Users/acharyya/Documents/writings/papers/magesample/fluxes/'+lab+'_fitted_detected --shortlabel '+lab],shell=True)
+        subprocess.call(['python '+HOME+'Documents/writings/papers/abundance_pap/dftolatex.py --infile '+fout+\
+    ' --outfile '+HOME+'Documents/writings/papers/magesample/fluxes/'+lab+'_fitted_detected --shortlabel '+lab],shell=True)
