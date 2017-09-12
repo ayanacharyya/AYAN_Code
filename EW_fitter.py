@@ -63,6 +63,10 @@ Usage: python EW_fitter.py --<options>
 --nodered ; boolean option, if present then does not perform dereddening corrections
 --nofit ; boolean option, if present then plots only the spectra, does not fit the lines
 --linelistpath LINELISTPATH ; LINELISTPATH=path to labframe.shortlinelist_emission or labframe.shortlinelist_photospheric
+--linelistfile LINELISTFILE; LINELISFILE=only filename of the line-list-to-be-fit file, if the name is not of the format labframe.shortlinelist_
+--debug ; boolean option, if present prints out debugging statements
+--fitinterven ; boolean option, if present tries to fit intervenning absorption lines from labframe.shortlinelist.interven
+--fixgroupz ; boolean option, if present tries to fit all lines in a group of neighboring lines with same redshift
 '''
 import sys
 sys.path.append('../')
@@ -106,6 +110,7 @@ parser.add_argument("--ncol")
 parser.add_argument("--usefnucont")
 parser.add_argument("--useflamcont")
 parser.add_argument("--linelistpath")
+parser.add_argument("--linelistfile")
 parser.add_argument('--keepprev', dest='keepprev', action='store_true')
 parser.set_defaults(keepprev=False)
 parser.add_argument('--silent', dest='silent', action='store_true')
@@ -144,6 +149,12 @@ parser.add_argument('--nodered', dest='nodered', action='store_true')
 parser.set_defaults(nodered=False)
 parser.add_argument('--nofit', dest='nofit', action='store_true')
 parser.set_defaults(nofit=False)
+parser.add_argument('--debug', dest='debug', action='store_true')
+parser.set_defaults(debug=False)
+parser.add_argument('--fitinterven', dest='fitinterven', action='store_true')
+parser.set_defaults(fitinterven=False)
+parser.add_argument('--fixgroupz', dest='fixgroupz', action='store_true')
+parser.set_defaults(fixgroupz=False)
 args, leftovers = parser.parse_known_args()
 if args.path is not None:
     path = args.path
@@ -272,23 +283,27 @@ elif 'fout' not in locals():
     fout = 'fitted_line_list.txt'
 if not args.keepprev:
     plt.close('all')
-
+if args.linelistfile is not None:
+    linelistfile = args.linelistfile
+    listname = ''
+else:
+    linelistfile = 'labframe.shortlinelist_'+listname
 #-------------------------------------------------------------------------
-specs = jrr.mage.getlist(mage_mode) #loading default spectra_redshift.txt file
+specs = jrr.mage.wrap_getlist(mage_mode, which_list="wcont", drop_s2243=True, optional_file=False, labels=(), zchoice='neb', MWdr=True) #loading default spectra_redshift.txt file
 loaded_esi, loaded_stack, loaded_other = False, False, False
 for thislabel in labels:
     if 'esi' in thislabel and not loaded_esi:
         optional_file = HOME+'Desktop/mage_plot/Spectra/esi-spectra-filenames-redshifts.txt'
         loaded_esi = True
-        specs = specs.append(jrr.mage.getlist(mage_mode, optional_file=optional_file)) #appending spectra_redshift.txt file for esi if there is any esi spectra to be fit
+        specs = specs.append(jrr.mage.wrap_getlist(mage_mode, which_list="wcont", drop_s2243=True, optional_file=optional_file, labels=(), zchoice='neb', MWdr=True)) #appending spectra_redshift.txt file for esi if there is any esi spectra to be fit
     if 'new-format' in thislabel and not loaded_other:
         optional_file = args.spec_list_file
         loaded_other = True
-        specs = specs.append(jrr.mage.getlist(mage_mode, optional_file=optional_file)) #appending spectra_redshift.txt file for other spectra if there is any
+        specs = specs.append(jrr.mage.wrap_getlist(mage_mode, which_list="labels", drop_s2243=True, optional_file=optional_file, labels=[thislabel], zchoice='neb', MWdr=False)) #appending spectra_redshift.txt file for other spectra if there is any
     elif 'stack' in thislabel and not loaded_stack:
         optional_file = HOME+'Dropbox/mage_atlas/Spectra/stacked-spectra-filenames-redshifts.txt'
         loaded_stack = True
-        specs = specs.append(jrr.mage.getlist(mage_mode, optional_file=optional_file)) #appending spectra_redshift.txt file for stack if there is any stacked spectra to be fit
+        specs = specs.append(jrr.mage.wrap_getlist(mage_mode, which_list="wcont", drop_s2243=True, optional_file=optional_file, labels=(), zchoice='neb', MWdr=True)) #appending spectra_redshift.txt file for stack if there is any stacked spectra to be fit
 
 specs = specs[specs['short_label'].isin(labels)] #curtailing specs to only those spectra that are to be fit
 (spec_path, line_path) = jrr.mage.getpath(mage_mode)
@@ -323,7 +338,7 @@ for ii in range(0, len(specs)) :
         resoln = 3e5/200.   # vel resol of 200km/s from file /Users/acharyya/Dropbox/mage_atlas/Contrib/S99/stack-A-sb99-fit.txt
         dresoln = 40.       # 
     else:
-        (sp_orig, resoln, dresoln)  = jrr.mage.open_spectrum(filename, zz_sys, mage_mode)
+        (sp_orig, resoln, dresoln, LL_dummy, zz_sys)  = jrr.mage.wrap_open_spectrum(shortlabel, mage_mode, addS99=False, zchoice='neb', MWdr=True)
     #-----------fitting continuum unless asked to use existing continuum column in spectrum dataframe----------------------------
     if args.usefnucont is not None:
         if colfnucont in sp_orig:
@@ -345,6 +360,12 @@ for ii in range(0, len(specs)) :
             sys.exit()
     else:
         m.fit_autocont(sp_orig, zz_sys, line_path,filename)
+        if 'flam_autocont' not in sp_orig: sp_orig['flam_autocont'] = jrr.spec.fnu2flam(sp_orig['wave'], sp_orig.fnu_autocont) #added this because now I use the new jrr.spec.fit_autocont() which, unlike jrr.mage.fit_autocont(), does not create flam_autocont and rest_***_cont columns
+        (dummy, rest_fnu_autocont, dummy) =  jrr.spec.convert2restframe(sp_orig['wave'], sp_orig.fnu_autocont, sp_orig.fnu_autocont,  zz_sys, 'fnu')
+        sp_orig['rest_fnu_autocont'] = pd.Series(rest_fnu_autocont)
+        (dummy, rest_flam, dummy)  = jrr.spec.convert2restframe(sp_orig['wave'], sp_orig.flam_autocont,  sp_orig.flam_u,  zz_sys, 'flam')    
+        sp_orig['rest_flam_autocont'] = pd.Series(rest_flam)
+
     #-------masking sky lines-----------------
     if 'stack' not in shortlabel:
         if args.mymask:
@@ -357,13 +378,12 @@ for ii in range(0, len(specs)) :
         continue
     #------calculating the EW limits at every point following Schneider et al. 1993---------
     m.calc_schneider_EW(sp_orig, resoln, plotit=args.showerr)
-    line_full = m.getlist(linelistpath+'labframe.shortlinelist_'+listname, zz_dic, zz_err_dic) #reading the linelist to be used for fittting
-    if os.path.exists(linelistpath+'labframe.shortlinelist_interven'):
+    print 'Loading line list to be fitted from '+linelistpath+linelistfile
+    line_full = m.getlist(linelistpath+linelistfile, zz_dic, zz_err_dic) #reading the linelist to be used for fittting
+    if os.path.exists(linelistpath+'labframe.shortlinelist_interven') and args.fitinterven:
         line_interven = m.get_interven_list(linelistpath+'labframe.shortlinelist_interven', zz_err = 0.0004) #reading the intervenning linelist
-        print 'Inclusing intervenning linelist from', linelistpath+'labframe.shortlinelist_interven'
-    else:
-        line_interven = pd.DataFrame()
-    if 'stack' not in shortlabel: line_full = pd.concat([line_full, line_interven], ignore_index=True) #appending the intervenning linelist to emission linelist
+        print 'Including intervening linelist from', linelistpath+'labframe.shortlinelist_interven'
+        line_full = pd.concat([line_full, line_interven], ignore_index=True) #appending the intervenning linelist to emission linelist
     line_full.sort_values('wave', inplace=True)
     #------------Preparing to plot----------------------------------------
 
@@ -438,10 +458,10 @@ for ii in range(0, len(specs)) :
             sp = sp_orig[sp_orig['wave'].between(xmin,xmax)]
             if not args.plotfnu:
                 ymin = np.min(sp.flam_u)*0.98 #setting ylimits for plotting, to little lower than minimum value of the error
-                ymax = np.max(sp.flam)*1.01 #little higher than maximum flux value
+                ymax = np.max(sp.flam)*1.5 #little higher than maximum flux value
             else:
                 ymin = np.min(sp.fnu_u)*0.98 #setting ylimits for plotting, to little lower than minimum value of the error
-                ymax = np.max(sp.fnu)*1.01 #little higher than maximum flux value
+                ymax = np.max(sp.fnu)*1.5 #little higher than maximum flux value
             try:
                 line = line_full[line_full['wave'].between(xmin*(1.+5./resoln), xmax*(1.-5./resoln))]
             except IndexError:
@@ -457,24 +477,24 @@ for ii in range(0, len(specs)) :
                         plt.step(sp.wave, sp.flam_u, color='gray')
                         plt.plot(sp.wave, sp.flam_autocont, color='y')
                         if ('stack' not in shortlabel and not args.saveeps) and ('esi' not in shortlabel and 'new-format' not in shortlabel):
-                            plt.step(sp.wave, sp.flam_cont, color='b')
+                            if 'flam_cont' in sp: plt.step(sp.wave, sp.flam_cont, color='b')
                             plt.ylim(0, 1.2E-17)
                         elif 'stack' in shortlabel:
                             plt.ylim(ymin,ymax)
                         else:
                             try:
-                                plt.ylim(min(0,ymin),min(3,ymax))
+                                plt.ylim(ymin,ymax)
                             except:
                                 pass
                         if args.extract: 
-                            plt.ylim(0,1.5e-17)
+                            plt.ylim(0,ymax)
                     else:
                         spec_color = 'k'
                         plt.step(sp.wave, sp.fnu, color=spec_color)
                         plt.step(sp.wave, sp.fnu_u, color='gray')
                         plt.plot(sp.wave, sp.fnu_autocont, color='y')
                         if ('stack' not in shortlabel and not args.saveeps) and ('esi' not in shortlabel and 'new-format' not in shortlabel):
-                            plt.step(sp.wave, sp.fnu_cont, color='b')
+                            if 'fnu_cont' in sp: plt.step(sp.wave, sp.fnu_cont, color='b')
                             plt.ylim(0, 1.2E-28)
                         else:
                             try:
@@ -482,7 +502,7 @@ for ii in range(0, len(specs)) :
                             except:
                                 pass
                         if args.extract:
-                            plt.ylim(0,0.8e-28)
+                            plt.ylim(0,ymax)
                     plt.xlim(xmin, xmax)
                     if args.extract:
                         ax1.set_xticks(np.round(np.arange(xmin+dx/(max_xticks+1),xmax,dx/(max_xticks+1))))
@@ -509,13 +529,17 @@ for ii in range(0, len(specs)) :
                 fig.subplots_adjust(hspace=0.4, top=0.90, bottom=0.10, left=0.10, right=0.95)
             else:
                 fig.subplots_adjust(hspace=0.7, top=0.94, bottom=0.05, left=0.06, right=0.95)
-            fig.text(0.5, 0.02, r'Observed Wavelength (${\AA}$)', ha='center')
-            fig.text(0.5, 0.96, r'Rest-frame Wavelength (${\AA}$)', ha='center')
-            if not args.plotfnu: fig.text(0.02, 0.5, r'$f_\lambda$ (ergs/s/$cm^2/{\AA}$)', va='center', rotation='vertical')
-            else: fig.text(0.02, 0.5, r'$f_\nu$ (ergs/s/$cm^2$/Hz)', va='center', rotation='vertical')
+            AA = '$\mathrm{\AA}$'
+            fig.text(0.5, 0.02, r'Observed Wavelength ('+AA+')', ha='center')
+            fig.text(0.5, 0.96, r'Rest-frame Wavelength ('+AA+')', ha='center')
+            if not args.plotfnu: fig.text(0.02, 0.5, r'$f_\lambda$ (ergs/s/cm$^2$/'+AA+')', va='center', rotation='vertical')
+            else: fig.text(0.02, 0.5, r'$f_\nu$ (ergs/s/cm$^2$/Hz)', va='center', rotation='vertical')
         if args.savepdf: pdf.savefig(fig)
         if args.saveeps: fig.savefig(name+'.eps')
-        if not args.hide: plt.show(block=False)
+        if not args.hide: 
+            print 'Debug524: Attempting to plot..' #
+            plt.show(block=False)
+            print 'Debug526: Done plotting.' #
     if args.savepdf:
         pdf.close()
     '''
@@ -544,11 +568,15 @@ line_table.zz = line_table.zz.astype(np.float64)
 line_table.zz_u = line_table.zz_u.astype(np.float64)
 line_table.EW_signi=line_table.EW_signi.astype(np.float64)
 line_table.f_signi=line_table.f_signi.astype(np.float64)
-if shortlabel == 'rcs0327-E' and not args.nodered:
-    print 'Extinction available for rcs0327-E. Performing redenning correction...'
-    E, E_u = 0.4, 0.07 #extinction from Whitaker et al. 2014
-    line_table['f_redcor'],line_table['f_redcor_u']=m.extinct(line_table.rest_wave, line_table.f_line, line_table.f_line_u, E, E_u, doMC=True, size=int(1e5))
-    line_table['f_Suplim_redcor'],dummy=m.extinct(line_table.rest_wave, line_table.f_Suplim, np.zeros(len(line_table)), E, E_u, doMC=True, size=int(1e5))
+if any(lab in shortlabel for lab in ['rcs0327-E','s1723']) and not args.nodered and args.see is None and args.extract is None:
+    niter = int(1e5) #no. of Monter Carlo realisations to be done while dereddening
+    print 'Extinction available for '+shortlabel+'. Performing redenning correction...'
+    if 'rcs0327-E' in shortlabel:
+        E, E_u = 0.4, 0.07 #extinction from Whitaker et al. 2014
+    elif 's1723' in shortlabel:
+        E, E_u = 0.3, 0.02 #mean value from those computed by AYAN_Code/calc_reddening.py  
+    line_table['f_redcor'],line_table['f_redcor_u']=m.extinct(line_table.rest_wave, line_table.f_line, line_table.f_line_u, E, E_u, doMC=False, size=niter)
+    line_table['f_Suplim_redcor'],dummy=m.extinct(line_table.rest_wave, line_table.f_Suplim, np.zeros(len(line_table)), E, E_u, doMC=False, size=niter)
     line_table['f_redcor']=line_table['f_redcor'].map('{:.3e}'.format)
     line_table['f_redcor_u']=line_table['f_redcor_u'].map('{:.3e}'.format)
     line_table['f_Suplim_redcor']=line_table['f_Suplim_redcor'].map('{:.3e}'.format)
@@ -614,6 +642,54 @@ elif listname == 'trial': #For correcting zz_sys: to check redshifts using only 
             temp_table = short_table[short_table['label'].eq(shortlabel)]
             myfile.write(shortlabel+'\t'+ str(specs['z_neb'][ii])+'\t'+str(np.mean(temp_table['zz']))+'\t'+str(np.median(temp_table['zz']))+'\t'+str(np.median(temp_table['zz_u']))+'\n')
     print 'Created file', fout
+elif 's1723' in shortlabel and args.see is None and args.extract is None:
+    EW_signi_thresh, constant = 1., 1e-17
+    quantities_to_extract = ['line_lab','rest_wave','f_line','f_line_u','EW_signi', 'f_SNR']
+    if 'f_redcor' in line_table : quantities_to_extract += ['f_redcor', 'f_redcor_u']
+    short_table = line_table[quantities_to_extract]
+    short_table = short_table[(short_table['EW_signi'] >= EW_signi_thresh) & (short_table['f_SNR'] > 0.)]
+    short_table.drop('EW_signi', axis=1, inplace=True)
+    short_table.drop('f_SNR', axis=1, inplace=True)
+    short_table.rename(columns={'line_lab':'ID'}, inplace=True)
+    short_table.rename(columns={'f_line':'integrated_flux'}, inplace=True)
+    short_table.rename(columns={'f_line_u':'uncert_flux'}, inplace=True)
+    if 'f_redcor' in short_table:
+        short_table.rename(columns={'f_redcor':'dered_flux'}, inplace=True)
+        short_table.rename(columns={'f_redcor_u':'uncert_dered_flux'}, inplace=True)
+    
+    
+    short_table['integrated_flux'] /= constant
+    short_table['uncert_flux'] /= constant
+    if 'dered_flux' in short_table:
+        short_table['dered_flux'] = short_table['dered_flux'].astype(np.float64)/constant
+        short_table['uncert_dered_flux'] = short_table['uncert_dered_flux'].astype(np.float64)/constant
+    
+    if 'ESI' in shortlabel: spectroscope = 'ESI'
+    elif 'MMT' in shortlabel: spectroscope = 'MMT'
+    short_table['spectrograph'] = spectroscope 
+    short_table['Notes'] = '--'
+
+    head = 'This file contains the measurements of lines in the MagE sample. Generated by EW_fitter.py.\n\
+    Columns are:\n\
+     line_lab:    label of the line the code was asked to fit\n\
+     rest_wave:   rest frame vacuum wavelength of the line (A)\n\
+     integrated_flux:      flux i.e. area under Gaussian fit (units of '+str(constant)+' erg/s/cm^2)\n\
+     uncert_flux:    error in above qty. (units of '+str(constant)+' erg/s/cm^2)\n\
+    '
+    if 'dered_flux' in short_table:
+        head += '\
+        dered_flux:    dereddened flux with E(B-V) = '+str(E)+' +/- '+str(E_u)+' (units of '+str(constant)+' erg/s/cm^2)\n\
+        uncert_dered_flux:    error in above qty. (units of '+str(constant)+' erg/s/cm^2)\n\
+        '
+
+    if 'MMT' in shortlabel: suffix = '.mmt' 
+    elif 'ESI' in shortlabel: suffix = '.esi'
+    fout = path+'s1723_measured_emission' + suffix
+    np.savetxt(fout+'.txt', [], header=head, comments='#')
+    short_table.to_csv(fout+'.txt', sep='\t',mode ='a', index=None)
+    short_table.to_latex(fout+'.tex', index=None)
+    print 'Short table saved to '+fout+'.txt and .tex'
+    print 'Detections below EW_signi = '+str(EW_signi_thresh)+' have not been included.'
 else:
     short_table = line_table[['line_lab','rest_wave','EWr_fit','EWr_fit_u','EWr_Suplim','EW_signi','f_line','f_line_u','f_SNR','f_Suplim','f_signi']]
 
