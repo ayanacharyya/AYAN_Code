@@ -7,17 +7,22 @@ import pandas as pd
 import sys
 import argparse as ap
 import os
+
 HOME = os.getenv('HOME')
-#---------------------------------------------------------------- 
+
+
+# ----------------------------------------------------------------
 def writespec_txt(spec, fout, z='', z_u='', filename=''):
-    head = '#1D spectrum for object file '+filename+'\n\
+    head = '#1D spectrum for object file ' + filename + '\n\
     #made using python convert_spectra_format.py by Ayan, Mar 2017\n\
-    redshift z = '+str(z)+'\n\
-    redshift uncertainty z_u = '+str(z_u)+'\n'
+    redshift z = ' + str(z) + '\n\
+    redshift uncertainty z_u = ' + str(z_u) + '\n'
     np.savetxt(fout, [], header=head, comments='#')
-    spec.to_csv(fout, sep='\t',mode ='a', index=None)
+    spec.to_csv(fout, sep='\t', mode='a', index=None)
     print 'Written dataframe to file ', fout
-#---------------------------------------------------------------- 
+
+
+# ----------------------------------------------------------------
 def writespeclist_txt(fout, specdir, shortlabel, z, z_u):
     if not os.path.exists(fout):
         head = '#Spectra: listed in the same format as individual ones for ease of being read by the code jrr.mage.getlist_labels()\n\
@@ -32,19 +37,24 @@ def writespeclist_txt(fout, specdir, shortlabel, z, z_u):
 origdir\t\tfilename\t\tshort_label\t\tz_stars\t\tsig_st\t\tfl_st\t\tz_neb\t\tsig_neb\t\tfl_neb\t\tz_ISM\t\tsig_ISM\t\tfl_ISM\t\tNOTES\n'
         np.savetxt(fout, [], header=head, comments='')
     written = 0
-    string_to_write = specdir+' '+shortlabel+'.txt'+' '+shortlabel+' '+str(z)+' '+str(z_u)+' '+str(0.)+' '+str(z)+' '+str(z_u)+' '+\
-            str(0.)+' '+str(z)+' '+str(z_u)+' '+str(0.)+' '+'converted-format'+'\n'
-    with open(fout, 'r') as f: data = f.readlines()
+    string_to_write = specdir + ' ' + shortlabel + '.txt' + ' ' + shortlabel + ' ' + str(z) + ' ' + str(
+        z_u) + ' ' + str(0.) + ' ' + str(z) + ' ' + str(z_u) + ' ' + \
+                      str(0.) + ' ' + str(z) + ' ' + str(z_u) + ' ' + str(0.) + ' ' + 'converted-format' + '\n'
+    with open(fout, 'r') as f:
+        data = f.readlines()
     for ind in range(len(data)):
         if shortlabel in data[ind]:
             data[ind] = string_to_write
             written = 1
     if not written:
         data.append(string_to_write)
-    with open(fout, 'w') as f: f.writelines(data)
+    with open(fout, 'w') as f:
+        f.writelines(data)
     print 'Written speclist to file ', fout
-#---------------------------------------------------------------- 
-#---------------------------------------------------------------- 
+
+
+# ----------------------------------------------------------------
+# ----------------------------------------------------------------
 parser = ap.ArgumentParser(description="Spectra format conversion tool")
 parser.add_argument("--inpath")
 parser.add_argument("--infile")
@@ -61,7 +71,7 @@ if args.inpath is not None:
     inpath = args.inpath
 else:
     inpath = '~/Dropbox/MagE_atlas/Contrib/Temp/'
-if HOME in inpath: inpath=inpath.replace(HOME,'~')
+if HOME in inpath: inpath = inpath.replace(HOME, '~')
 if args.infile is not None:
     infile = args.infile
 else:
@@ -97,17 +107,17 @@ if args.zu is not None:
 else:
     zu = 0.0
 
-sp_inp =  pd.read_table(inpath+infile, delim_whitespace=True, comment="#", header=0)
+sp_inp = pd.read_table(inpath + infile, delim_whitespace=True, comment="#", header=0)
 sp = pd.DataFrame()
 sp['obswave'] = sp_inp[wavecol]
-sp['flam'] = sp_inp[flamcol]*flamconst
-sp['flam_u'] = sp_inp[flamucol]*flamconst
-sp['restwave'] = sp['obswave']/(1+z)
+sp['flam'] = sp_inp[flamcol] * flamconst
+sp['flam_u'] = sp_inp[flamucol] * flamconst
+sp['restwave'] = sp['obswave'] / (1 + z)
 sp['badmask'] = False
 
-if flamcontcol in sp_inp: sp['flam_cont'] = sp_inp[flamcontcol]*flamconst
+if flamcontcol in sp_inp: sp['flam_cont'] = sp_inp[flamcontcol] * flamconst
 
 outfile = infile[:-4] + '_new-format.txt'
-writespec_txt(sp, os.path.expanduser(inpath)+outfile, z=z, z_u=zu, filename=inpath+infile)
-writespeclist_txt(os.path.expanduser(inpath)+'other-spectra-filenames-redshifts.txt', inpath, outfile[:-4], z, zu)
+writespec_txt(sp, os.path.expanduser(inpath) + outfile, z=z, z_u=zu, filename=inpath + infile)
+writespeclist_txt(os.path.expanduser(inpath) + 'other-spectra-filenames-redshifts.txt', inpath, outfile[:-4], z, zu)
 print 'All Done!'
