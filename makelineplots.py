@@ -5,17 +5,19 @@ plot. Still a the crude version.
 Started July 2016, Ayan acharyya
 '''
 import sys
-
 sys.path.append('../')
+
 import jrr
 import numpy as np
 import pandas as pd
-
 pd.set_option('display.max_rows', 50)
 pd.set_option('display.max_columns', 50)
 pd.set_option('display.width', 1000)
+
 from matplotlib import pyplot as plt
 import argparse as ap
+import os
+HOME = os.getenv('HOME')+'/'
 
 parser = ap.ArgumentParser(description="Mage spectra fitting tool")
 parser.add_argument('--n')
@@ -37,18 +39,13 @@ def detect(table, line, ew_thresh=4, fSNR_thresh=1):
 
 
 # --------------------------------------
-output_path = '/Users/acharyya/Desktop/mage_plot/'  # where is the output to be put
-input_path = '/Users/acharyya/Dropbox/MagE_atlas/Contrib/EWs/'  # where is the dataframe resides
-table1 = pd.read_table(input_path + 'allspec_fitted_emission_linelist.txt', delim_whitespace=True,
-                       comment="#")  # input dataframe file
-table2 = pd.read_table(input_path + 'all_byneb_stack_fitted_emission_linelist.txt', delim_whitespace=True,
-                       comment="#")  # input dataframe file
-table3 = pd.read_table(input_path + 'allesi_fitted_emission_linelist.txt', delim_whitespace=True,
-                       comment="#")  # input dataframe file
-frames = [table1, table2, table3]  # which dataframes to include
-fulltable = pd.concat(frames)
-lines = pd.read_table('labframe.shortlinelist_emission', delim_whitespace=True,
-                      comment="#")  # input list of lines fitted
+input_path = HOME+'Dropbox/MagE_atlas/Contrib/EWs/emission/'  # where is the dataframe resides
+output_path = input_path
+table1 = pd.read_table(input_path + 'allspec_fitted_emission_measured.txt', delim_whitespace=True, comment="#")  # input dataframe file
+#table2 = pd.read_table(input_path + 'byneb_stack_fitted_emission_measured.txt', delim_whitespace=True, comment="#")  # input dataframe file
+#table3 = pd.read_table(input_path + 'allesi_fitted_emission_linelist.txt', delim_whitespace=True, comment="#")  # input dataframe file
+fulltable = pd.concat([table1]) #, table2, table3])  # which dataframes to include
+lines = pd.read_table(HOME+'Dropbox/MagE_atlas/Contrib/EWs/linelists/labframe.shortlinelist_emission', delim_whitespace=True, comment="#")  # input list of lines fitted
 excludelabel = ['magestack_byneb_highZ', 'magestack_byneb_lowZ', 'magestack_byneb_midage8to16Myr', \
                 'magestack_byneb_oldgt16Myr',
                 'magestack_byneb_younglt8Myr']  # 'S0004-0103']#'rcs0327-E']#'S0957+0509']#,'S1050+0017',]# 'S1429+1202'] #which spectra to exclude
@@ -58,7 +55,7 @@ colors = 'rcmybgrmcybgrmcybg'  # color schemes
 # ------------------------------------------------
 lines_num = ['OIII]1660', 'OIII]1666']
 # lines_num = ['[OIII]2320', '[OIII]2331']
-lines_den = ['OII2470mid']
+lines_den = ['OII2470']
 
 # lines_num = ['CIII977']
 # lines_num = ['CIII]1906', 'CIII]1908']
@@ -196,28 +193,29 @@ for ii in range(0, len(labels)):
         pl=ax1.errorbar(z, -1.*a, fmt='o', lw=0.5, xerr=zu, yerr=np.sqrt(avar))
     #--------------------------------------------------------------
     '''
-    '''
+
     #------------------For no. of galaxies vs line index histogram--------------------------------------------
     for jj, line in enumerate(lines.LineID):
         if table['line_lab'].isin([line]).any() and detect(table,line):
             h[jj] += 1
 fig=plt.figure(figsize=(16,8))
 fig.subplots_adjust(hspace=0.7, top=0.94, bottom=0.1, left=0.06, right=0.98)
-plt.bar(range(len(lines)), h, lw=0, align = 'center', color=color)
-plt.xticks(range(len(lines)+1),np.concatenate((lines.LineID.values,[' '])), rotation = 90, fontsize='small')
+plt.bar(np.hstack([-1,range(len(lines))]), np.hstack([0,h]), lw=0, align = 'center', color=color)
+plt.xticks(range(len(lines)),lines.LineID.values, rotation = 90, fontsize='small')
 #--------------------------------------------------------------
-'''
 
+'''
     # ------------------For no. of lines vs galaxy index histogram--------------------------------------------
     for jj, line in enumerate(lines.LineID):
         if table['line_lab'].isin([line]).any() and detect(table, line):
             g[ii] += 1
+
 fig = plt.figure(figsize=(16, 8))
 fig.subplots_adjust(hspace=0.7, top=0.94, bottom=0.2, left=0.06, right=0.98)
-plt.bar(range(len(labels)), g, lw=0, align='center', color=color)
-plt.xticks(range(len(labels) + 1), np.concatenate((labels, [' '])), rotation=90, fontsize='small')
+plt.bar(np.hstack([-1,range(len(labels))]), np.hstack([0,g]), lw=0, align='center', color=color)
+plt.xticks(range(len(labels)), labels, rotation=90, fontsize='small')
 # --------------------------------------------------------------
-
+    '''
 '''
 #------------------For A (line) vs line index plot--------------------------------------------
 try:
@@ -229,8 +227,8 @@ except:
 #--------------------------------------------------------------
 '''
 
-t = 'lines_detected_histogram'  # 'Comparing_'+quantity#
-ylab = 'Number_of_lines_detected'  # '('+'+'.join(lines_num)+')'#'Number_of_galaxies'#'('+'+'.join(lines_num)+')_by_('+'+'.join(lines_den)+')' #
+t = 'lines_measured_histogram'  # 'Comparing_'+quantity#
+ylab = 'Number_of_galaxies'#'Number_of_lines_measured'  # '('+'+'.join(lines_num)+')'#'('+'+'.join(lines_num)+')_by_('+'+'.join(lines_den)+')' #
 xlab = 'objectID'  # '('+'+'.join(lines_den)+')'#'linesID'#
 extend = 0  # to extend plot region
 plt.ylabel(ylab)
@@ -256,13 +254,13 @@ ax2.set_xticklabels(lines.LineID, rotation = 45, ha='left', fontsize='small')
 '''
 '''
 #----------For anything vs object index plot----------------------------------------------------
-ax1.set_xticks(np.arange(len(labels))+1)
+ax1.set_xticks(np.hstack([-1,np.arange(len(labels))]))
 ax1.set_xticklabels(labels, rotation = 45, ha='right', fontsize='small')
 plt.xlim(0,len(labels)+1)
 #--------------------------------------------------------------
 '''
 
-out = output_path + t + '_' + ylab + '_vs_' + xlab + '_all.png'
+out = output_path + t + '_' + ylab + '_vs_' + xlab + '_all.eps'
 # out = 'junk' #
 fig.savefig(out)
 print 'Saved as', out

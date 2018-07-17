@@ -71,8 +71,9 @@ Usage: python EW_fitter.py --<options>
 --frac_overlap FRAC_OVERLAP ; FRAC_OVERLAP = fraction of dx wavelength to be included in previous frame, to ensure overlap between frames so that no line is missed from fitting
 '''
 import sys
-
-sys.path.append('../')
+import os
+HOME = os.getenv('HOME') + '/'
+sys.path.append(HOME+'Work/astro/ayan_codes/mageproject/')
 import ayan.mage as m
 import jrr
 import ayan.splot_util as s
@@ -88,9 +89,6 @@ from matplotlib import pyplot as plt
 mage_mode = "released"
 import argparse as ap
 from matplotlib.backends.backend_pdf import PdfPages
-import os
-
-HOME = os.getenv('HOME') + '/'
 import subprocess
 
 # -----------Main function starts------------------
@@ -151,8 +149,8 @@ parser.add_argument('--showerr', dest='showerr', action='store_true')
 parser.set_defaults(showerr=False)
 parser.add_argument('--plotfnu', dest='plotfnu', action='store_true')
 parser.set_defaults(plotfnu=False)
-parser.add_argument('--makelatex', dest='makelatex', action='store_true')
-parser.set_defaults(makelatex=False)
+parser.add_argument('--magesample', dest='magesample', action='store_true')
+parser.set_defaults(magesample=False)
 parser.add_argument('--nodered', dest='nodered', action='store_true')
 parser.set_defaults(nodered=False)
 parser.add_argument('--nofit', dest='nofit', action='store_true')
@@ -256,48 +254,6 @@ if args.allesi:
         'J1458_arc_b_esi', \
         ]
     fout = path + 'allesi_fitted_' + listname + '_measured.txt'
-if args.allspec:
-    labels = [
-        'rcs0327-B',\
-        'rcs0327-E', \
-        'rcs0327-Ehires',\
-        'rcs0327-Elores',\
-        'rcs0327-G', \
-        'rcs0327-U', \
-        'rcs0327-BDEFim1',\
-        'rcs0327-counterarc',\
-        'S0004-0103', \
-        'S0004-0103alongslit',\
-        'S0004-0103otherPA',\
-        'S0033+0242', \
-        'S0108+0624', \
-        'S0900+2234', \
-        'S0957+0509', \
-        'S1050+0017', \
-        'Horseshoe', \
-        'S1226+2152', \
-        'S1226+2152hires',\
-        'S1226+2152lores',\
-        'S1429+1202', \
-        'S1458-0023', \
-        'S1527+0652', \
-        # 'S1527+0652-fnt',\
-        'S2111-0114', \
-        'Cosmic~Eye', \
-        # 'S2243-0935', \
-        'planckarc_pos1', \
-        'planckarc_slit4a', \
-        'planckarc_slit4bc', \
-        'planckarc', \
-        'PSZ0441_slitA', \
-        'PSZ0441_slitB', \
-        'PSZ0441', \
-        'SPT0310_slitA', \
-        'SPT0310_slitB', \
-        'SPT0310', \
-        'SPT2325',\
-    ]
-    fout = path + 'allspec_fitted_' + listname + '_measured.txt'
 if args.fout is not None:
     fout = path + str(args.fout)
     if not fout[-4:] == '.txt': fout += '.txt'
@@ -316,33 +272,39 @@ if args.linelistfile is not None:
 else:
     linelistfile = 'labframe.shortlinelist_' + listname
 # -------------------------------------------------------------------------
-specs = jrr.mage.wrap_getlist(mage_mode, which_list="wcont", drop_s2243=True, optional_file=False, labels=(),
+specs = jrr.mage.wrap_getlist(mage_mode, which_list="all", drop_s2243=True, optional_file=False, labels=(),
                               zchoice='neb', MWdr=True)  # loading default spectra_redshift.txt file
-loaded_esi, loaded_stack, loaded_other = False, False, False
-for thislabel in labels:
-    if 'esi' in thislabel and not loaded_esi:
-        optional_file = HOME + 'Desktop/mage_plot/Spectra/esi-spectra-filenames-redshifts.txt'
-        loaded_esi = True
-        specs = specs.append(
-            jrr.mage.wrap_getlist(mage_mode, which_list="wcont", drop_s2243=True, optional_file=optional_file,
-                                  labels=(), zchoice='neb',
-                                  MWdr=True))  # appending spectra_redshift.txt file for esi if there is any esi spectra to be fit
-    if 'new-format' in thislabel and not loaded_other:
-        optional_file = args.spec_list_file
-        loaded_other = True
-        specs = specs.append(
-            jrr.mage.wrap_getlist(mage_mode, which_list="labels", drop_s2243=True, optional_file=optional_file,
-                                  labels=[thislabel], zchoice='neb',
-                                  MWdr=False))  # appending spectra_redshift.txt file for other spectra if there is any
-    elif 'stack' in thislabel and not loaded_stack:
-        optional_file = HOME + 'Dropbox/mage_atlas/Spectra/stacked-spectra-filenames-redshifts.txt'
-        loaded_stack = True
-        specs = specs.append(
-            jrr.mage.wrap_getlist(mage_mode, which_list="labels", drop_s2243=True, optional_file=optional_file,
-                                  labels=[thislabel], zchoice='neb',
-                                  MWdr=True))  # appending spectra_redshift.txt file for stack if there is any stacked spectra to be fit
+if args.allspec:
+    galaxies_to_discard = ['S1527+0652-fnt', 'S2243-0935']
+    specs = specs[~specs['short_label'].isin(galaxies_to_discard)]
+    labels = specs['short_label']
+    fout = path + 'allspec_fitted_' + listname + '_measured.txt'
+else:
+    loaded_esi, loaded_stack, loaded_other = False, False, False
+    for thislabel in labels:
+        if 'esi' in thislabel and not loaded_esi:
+            optional_file = HOME + 'Desktop/mage_plot/Spectra/esi-spectra-filenames-redshifts.txt'
+            loaded_esi = True
+            specs = specs.append(
+                jrr.mage.wrap_getlist(mage_mode, which_list="wcont", drop_s2243=True, optional_file=optional_file,
+                                      labels=(), zchoice='neb',
+                                      MWdr=True))  # appending spectra_redshift.txt file for esi if there is any esi spectra to be fit
+        elif 'new-format' in thislabel and not loaded_other:
+            optional_file = args.spec_list_file
+            loaded_other = True
+            specs = specs.append(
+                jrr.mage.wrap_getlist(mage_mode, which_list="labels", drop_s2243=True, optional_file=optional_file,
+                                      labels=[thislabel], zchoice='neb',
+                                      MWdr=False))  # appending spectra_redshift.txt file for other spectra if there is any
+        elif 'stack' in thislabel and not loaded_stack:
+            optional_file = HOME + 'Dropbox/mage_atlas/Spectra/stacked-spectra-filenames-redshifts.txt'
+            loaded_stack = True
+            specs = specs.append(
+                jrr.mage.wrap_getlist(mage_mode, which_list="labels", drop_s2243=True, optional_file=optional_file,
+                                      labels=[thislabel], zchoice='neb',
+                                      MWdr=True))  # appending spectra_redshift.txt file for stack if there is any stacked spectra to be fit
 
-specs = specs[specs['short_label'].isin(labels)]  # curtailing specs to only those spectra that are to be fit
+    specs = specs[specs['short_label'].isin(labels)]  # curtailing specs to only those spectra that are to be fit
 (spec_path, line_path) = jrr.mage.getpath(mage_mode)
 line_table = pd.DataFrame(
     columns=['label', 'line_lab', 'obs_wav', 'rest_wave', 'type', 'EWr_fit', 'EWr_fit_u', 'EWr_sum', \
@@ -430,13 +392,13 @@ for ii in range(0, len(specs)):
             continue
         # ------calculating the EW limits at every point following Schneider et al. 1993---------
         m.calc_schneider_EW(sp_orig, resoln, plotit=args.showerr)
-        print 'Loading line list to be fitted from ' + linelistpath + linelistfile
+        if not ii: print 'Loading line list to be fitted from ' + linelistpath + linelistfile
         line_full = m.getlist(linelistpath + linelistfile, zz_dic,
                               zz_err_dic)  # reading the linelist to be used for fittting
         if os.path.exists(linelistpath + 'labframe.shortlinelist_interven') and args.fitinterven:
             line_interven = m.get_interven_list(linelistpath + 'labframe.shortlinelist_interven',
                                                 zz_err=0.0004)  # reading the intervenning linelist
-            print 'Including intervening linelist from', linelistpath + 'labframe.shortlinelist_interven'
+            if not ii: print 'Including intervening linelist from', linelistpath + 'labframe.shortlinelist_interven'
             line_full = pd.concat([line_full, line_interven],
                                   ignore_index=True)  # appending the intervenning linelist to emission linelist
         line_full.sort_values('wave', inplace=True)
@@ -459,11 +421,11 @@ for ii in range(0, len(specs)):
         else:
             n_arr = [int(ar) - 1 for ar in frame.split(',')]  # Use this to display selected frame/s
         if args.extract:
-            name = path + shortlabel + '-individual-lines_fit-' + args.extract
+            name = shortlabel + '-individual-lines_fit-' + args.extract
         else:
-            name = path + shortlabel + '_' + listname + '_fit'
+            name = shortlabel + '_' + listname + '_fit'
         if args.savepdf:
-            pdf = PdfPages(name + '.pdf')
+            pdf = PdfPages(path + 'spectra_plots/' + name + '.pdf')
         # ---------pre check in which frames lines are available if display_only_success = 1---------
         # ---------------------------just a visualisation thing-----------------------------------
         if display_only_success and args.extract is None:
@@ -545,7 +507,7 @@ for ii in range(0, len(specs)):
                             if ('stack' not in shortlabel and not args.saveeps) and (
                                     'esi' not in shortlabel and 'new-format' not in shortlabel):
                                 if 'flam_cont' in sp: plt.step(sp.wave, sp.flam_cont, color='b')
-                                plt.ylim(0, 1.2E-17)
+                                #plt.ylim(0, 1.2E-17)
                             elif 'stack' in shortlabel:
                                 plt.ylim(ymin, ymax)
                             else:
@@ -607,11 +569,11 @@ for ii in range(0, len(specs)):
                 else:
                     fig.text(0.02, 0.5, r'$f_\nu$ (ergs/s/cm$^2$/Hz)', va='center', rotation='vertical')
             if args.savepdf: pdf.savefig(fig)
-            if args.saveeps: fig.savefig(name + '.eps')
+            if args.saveeps: fig.savefig(path + name + '.eps')
             if not args.hide:
-                #print 'Debug524: Attempting to plot..'  #
+                if not args.silent: print 'Debug524: Attempting to plot..'  #
                 plt.show(block=False)
-                #print 'Debug526: Done plotting.'  #
+                if not args.silent: print 'Debug526: Done plotting.'  #
         if args.savepdf:
             pdf.close()
 
@@ -722,11 +684,13 @@ elif listname == 'trial':  # For correcting zz_sys: to check redshifts using onl
                 shortlabel + '\t' + str(specs['z_neb'][ii]) + '\t' + str(np.mean(temp_table['zz'])) + '\t' + str(
                     np.median(temp_table['zz'])) + '\t' + str(np.median(temp_table['zz_u'])) + '\n')
     print 'Created file', fout
+
 elif 's1723' in shortlabel and args.see is None and args.extract is None:
     EW_signi_thresh, constant = 1., 1e-17
     quantities_to_extract = ['line_lab', 'rest_wave', 'f_line', 'f_line_u', 'EW_signi', 'f_SNR']
     if 'f_redcor' in line_table: quantities_to_extract += ['f_redcor', 'f_redcor_u']
     short_table = line_table[quantities_to_extract]
+    '''
     short_table = short_table[(short_table['EW_signi'] >= EW_signi_thresh) & (short_table['f_SNR'] > 0.)]
     short_table.drop('EW_signi', axis=1, inplace=True)
     short_table.drop('f_SNR', axis=1, inplace=True)
@@ -751,6 +715,7 @@ elif 's1723' in shortlabel and args.see is None and args.extract is None:
     short_table['Notes'] = '--'
 
     head = 'This file contains the measurements of lines in the MagE sample. Generated by EW_fitter.py.\n\
+    This file is same as s1723_***_emission_measured_lines.txt except re-formatted to match format of JRRs WFC3_measrued.txt so as to combine all spectra.\n\
     Columns are:\n\
      line_lab:    label of the line the code was asked to fit\n\
      rest_wave:   rest frame vacuum wavelength of the line (A)\n\
@@ -773,6 +738,7 @@ elif 's1723' in shortlabel and args.see is None and args.extract is None:
     short_table.to_latex(fout + '.tex', index=None)
     print 'Short table saved to ' + fout + '.txt and .tex'
     print 'Detections below EW_signi = ' + str(EW_signi_thresh) + ' have not been included.'
+    '''
 else:
     short_table = line_table[
         ['line_lab', 'rest_wave', 'EWr_fit', 'EWr_fit_u', 'EWr_Suplim', 'EW_signi', 'f_line', 'f_line_u', 'f_SNR',
@@ -780,10 +746,11 @@ else:
 
 print 'Some columns of the table are:'
 print short_table
-if not args.extract and not args.see: print 'Fit a total of ' + str(count) + ' out of ' + str(
-    len(line_full)) + ' lines.'
+if not args.extract and not args.see:
+    print 'Fit a total of ' + str(count) + ' out of ' + str(len(line_full)) + ' lines.'
+    if count != len(line_full): print 'To be able to capture all lines try option --dx ### where ### is a number around but not equal to 300.'
 # -------------For correcting zz_ism------------------
-if listname is 'ism':
+if listname == 'ism':
     print 'label', 'median zz_ism', 'median zz_ism_u'
     for ii in range(0, len(specs)):
         shortlabel = specs['short_label'][ii]
@@ -806,10 +773,10 @@ if args.check:
     else:
         print 'No lines detected.'
 # ------------------------------------------End of main function------------------------------------------------
-if args.makelatex:
+if args.magesample:
     print 'List of spec', labels
     for lab in labels:
         print 'Converting df to tex for spec', lab
-        subprocess.call(['python ' + HOME + 'Documents/writings/papers/abundance_pap/dftolatex.py --infile ' + fout + \
-                         ' --outfile ' + HOME + 'Documents/writings/papers/magesample/fluxes/' + lab + '_fitted_detected --shortlabel ' + lab],
+        subprocess.call(['python ' + HOME + 'Work/astro/ayan_codes/mageproject/AYAN_Code/dftolatex.py --infile '\
+                         +fout+' --shortlabel '+lab+' --notex'],
                         shell=True)

@@ -8,7 +8,6 @@ pd.set_option('display.max_columns', 50)
 pd.set_option('display.width', 1000)
 import argparse as ap
 import os
-
 HOME = os.getenv('HOME') + '/'
 import sys
 
@@ -16,7 +15,7 @@ sys.path.append(HOME + 'Work/astro/ayan_codes/mageproject/')
 import ayan.splot_util as u
 import ayan.mage as m
 import re
-
+import subprocess
 
 # -----------to check if line is detected given our etection criteria------------------------------------
 def detect(table, EW_thresh=0, SNR_thresh=0, EW_signi='EW_signi', flux='f_line', flux_u='f_line_u'):
@@ -86,6 +85,7 @@ parser.add_argument('--notex', dest='notex', action='store_true')
 parser.set_defaults(notex=False)
 
 parser.add_argument("--infile")
+parser.add_argument("--outpath")
 parser.add_argument("--outfile")
 parser.add_argument("--shortlabel")
 parser.add_argument("--EW_thresh")
@@ -96,11 +96,23 @@ if args.infile is not None:
     infile = args.infile
 else:
     infile = HOME + 'Documents/writings/papers/abundance_pap/lineflux_restUV.txt'  # full-path-name of input file
+inpath = os.path.split(infile)[0] + '/'
+if args.shortlabel is None: args.shortlabel = 'rcs0327-E'
+
+if args.outpath is not None:
+    outpath = args.outpath
+else:
+    outpath = inpath  # full-path of output directory
+subprocess.call(['mkdir -p '+outpath+'PIZI_files/'], shell=True)
+subprocess.call(['mkdir -p '+outpath+'txt_files/'], shell=True)
+subprocess.call(['mkdir -p '+outpath+'tex_files/'], shell=True)
+
 if args.outfile is not None:
     outfile = args.outfile
+elif 'allspec' in infile:
+    outfile = os.path.splitext(os.path.basename(infile))[0].replace('allspec', args.shortlabel) + '_detected'
 else:
-    outfile = infile[:-4] + '_detected'
-if args.shortlabel is None: args.shortlabel = 'rcs0327-E'
+    outfile = os.path.splitext(os.path.basename(infile))[0] + '_detected'
 
 if args.EW_thresh is not None:
     EW_thresh = float(args.EW_thresh)
@@ -219,9 +231,9 @@ else:
 tab_txt = tab.replace(['nan'], ['-'], regex=True)
 
 # --adding header to txt file--
-np.savetxt(outfile + '.txt', [], header=header, comments='#')
-tab_txt.to_csv(outfile + '.txt', sep='\t', mode='a', index=None)
-print 'Written files ' + outfile + '.txt'
+np.savetxt(outpath+'txt_files/' + outfile + '.txt', [], header=header, comments='#')
+tab_txt.to_csv(outpath+'txt_files/' + outfile + '.txt', sep='\t', mode='a', index=None)
+print 'Written files ' + outpath+'txt_files/' + outfile + '.txt'
 
 if not args.nopizi and not args.onlyinterv:
     # --writing to separate txt file for use by PIZI--
@@ -229,19 +241,19 @@ if not args.nopizi and not args.onlyinterv:
     no_PIZI_lines = ['Fe', 'Mg', 'Blend']  # lines certainly not to be included for PIZI
     labelcol = 'ID' if 's1723' in args.shortlabel else 'line_lab'
     for l in no_PIZI_lines: tab_txt[labelcol] = tab_txt[labelcol].str.replace(l, '#' + l)
-    with open(outfile + '_forPIZI.txt', 'w') as file:
+    with open(outpath+'PIZI_files/' + outfile + '_forPIZI.txt', 'w') as file:
         file.write(header)
-    tab_txt.to_csv(outfile + '_forPIZI.txt', sep='\t', mode='a', index=None)
+    tab_txt.to_csv(outpath+'PIZI_files/' + outfile + '_forPIZI.txt', sep='\t', mode='a', index=None)
 
     # --adding few lines by hand to txt file for use by PIZI--
     if args.shortlabel == 'rcs0327-E' and not args.onlyinterv:
-        with open(outfile + '_forPIZI.txt', 'a') as f:
+        with open(outpath+'PIZI_files/' + outfile + '_forPIZI.txt', 'a') as f:
             f.write('\
 #Added OII lines to use for PIZI input for UV+O2 case\n\
 #OII3727	3727.092		999     999     509.228	17.400	1281.769	28.999\n\
 #OII3729	3729.875		999     999     443.935	23.182	1512.625	34.773\n\
 ')
-    print 'Written ' + outfile + '_forPIZI.txt'
+    print 'Written ' + outpath+'PIZI_files/' + outfile + '_forPIZI.txt'
 
 if not args.notex:
     # --replacing stuff in tex file--
@@ -268,29 +280,31 @@ if not args.notex:
     tab_tex['Line ID'] = tab_tex['Line ID'].apply(
         lambda x: format_forbidden(x))  # to format line labels with space and brackets
     # --writing the tex file--
-    tab_tex.to_latex(outfile + '.tex', index=None, escape=False)
+    tab_tex.to_latex(outpath+'tex_files/' + outfile + '.tex', index=None, escape=False)
 
     # --assigning captions--
     if args.shortlabel == 'rcs0327-E':
         if args.onlyinterv:
-            caption = 'Intervening absorption lines in \knotE Magellan/MagE spectrum. $EW$ denotes the rest-frame \
+            caption = 'Intervening absorption lines in \knotE Magellan/MagE spectrum. W$_{\mathrm{r,fit}}$ denotes the rest-frame \
     equivalent width measured, in \AA. $z$ an $\Delta z$ are the redshift and corresponding uncertainty respectively, as \
     measured from our line fitting code.'
+            subcaption = r'& (\AA) & (\AA) & (\AA) & & \\'
         elif args.onlyem:
-
             caption = 'MagE/Magellan line flux measurements. flux$_{\mathrm{obs}}$ and $\delta$ flux$_{\mathrm{obs}}$ denote \
 the observed flux and uncertainty respectively. flux$_{\mathrm{dereddened}}$ is the dereddened flux using \
-E(B-V) = 0.4 $\pm$ 0.07. All fluxes and uncertainties are in units of \
-10$^{' + str(int(np.log10(const))) + '}$ ergs/s/cm$^2$. W$_\mathrm{r,fit}$ and $\delta$ W$_{\mathrm{r,fit}}$ denote the rest-frame \
+E(B-V) = 0.4 $\pm$ 0.07. W$_\mathrm{r,fit}$ and $\delta$ W$_{\mathrm{r,fit}}$ denote the rest-frame \
 equivalent width measured and the corresponding uncertainty in \AA\, respectively. For cases of \
 non-detection (i.e. < ' + str(int(EW_thresh)) + ' $\sigma$ detection), the 3 $\sigma$ upper limit on equivalent widths and fluxes are quoted. \
 Uncertainty estimates for these entries are not quoted because they do not provide any meaningful information.'
+            subcaption = '& (\AA) & (\AA) & (\AA) & (\AA) & (10$^{' + str(int(np.log10(const))) + '}$ ergs/s/cm$^2$) & \
+            (10$^{' + str(int(np.log10(const))) + '}$ ergs/s/cm$^2$) & (10$^{' + str(int(np.log10(const))) + r'}$ ergs/s/cm$^2$) \\'
     else:
         caption = ''
+        subcaption = ''
     # --adding caption to beginning of table--
-    u.insert_line_in_file(r'\caption{' + caption + '}\n', 0,
-                          outfile + '.tex')  # use -1 instead of 0 to append caption to end of table
-    print 'Written ' + outfile + '.tex'
+    u.insert_line_in_file(r'\caption{' + caption + '}\n', 0, outpath+'tex_files/' + outfile + '.tex')  # use -1 instead of 0 to append caption to end of table
+    u.insert_line_in_file(subcaption + '\n', 4, outpath+'tex_files/' + outfile + '.tex')  # use -1 instead of 0 to append caption to end of table
+    print 'Written ' + outpath+'tex_files/' + outfile + '.tex'
 
 if not args.notex:
     print tab_tex
