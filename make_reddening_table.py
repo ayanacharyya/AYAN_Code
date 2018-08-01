@@ -2,6 +2,7 @@
 # by Ayan, Sep 2017
 
 import numpy as np
+from matplotlib import pyplot as plt
 from uncertainties import unumpy as unp
 import pandas as pd
 import os
@@ -32,7 +33,11 @@ ratio_theoretical = np.array([2.8785 / 1, 2.8785 / 1, 1 / 0.46756, 1 / .25825]) 
 g102_hlist = ['Hbeta', 'Hgamma', 'Hdelta', 'Hepsilon']
 g141_hlist = ['Halpha', 'Hbeta']
 
-for item in filenames:
+plt.close('all')
+fig, ax = plt.subplots()
+fig.subplots_adjust(hspace=0.1, wspace=0.03, top=0.97, bottom=0.2, left=0.1, right=0.98)
+
+for (index,item) in enumerate(filenames): # for each roll
     wfc_g102_file = input_path + 'sgas1723_1Dsum_'+item+'_G102_wcontMWdr_meth2.fitdf'
     wfc_g102_file = cr.deredden(wfc_g102_file, 0.3, 0.02, niter=int(1e5), constant=1e-17, dered=True, change_ID=True, change_errors=True,
                         SNR_thresh=0.014, readcsv=True)  # to deredden WFC3 spectra and re-write the file
@@ -50,8 +55,23 @@ for item in filenames:
                  H_g102[0] / H_g102[2]]  # , H_g102[0]/H_g102[3], H_g102[0]/(H_esi[0]*esi_to_mmt_scale), H_esi[0]/H_esi[1]]
     Eb_v = (2.5 / delta_k) * unp.log10(ratio_obs / ratio_theoretical)
     print '\nMean E(B-V) =', np.mean(Eb_v)
-    edf = pd.concat([edf, pd.DataFrame(np.transpose(np.vstack([ratio_labels, spec_labels, ['%.2F' % x.n for x in Eb_v], ['%.2F' % x.s for x in Eb_v], ['%.2F' % x.n for x in ratio_obs]])),
-        columns=['Line ratio', 'Grism(s)', 'E(B-V)', r'E(B-V)$_u$', 'Observed ratio'])])
+    edf = pd.concat([edf, pd.DataFrame(np.transpose(np.vstack([ratio_labels, spec_labels, ['%.2F' % x.n for x in Eb_v], ['%.2F' % x.s for x in Eb_v], ['%.2F' % x.n for x in ratio_obs], ['%.2F' % x.s for x in ratio_obs]])),
+        columns=['Line ratio', 'Grism(s)', 'E(B-V)', r'E(B-V)$_u$', 'Observed ratio', 'Observed ratio uncert'])])
+    # ------to plot the E(B-V) values for visual comparison-----
+    col_ar = ['r', 'g', 'b', 'orange']
+    for ii in range(len(Eb_v)):
+        ax.scatter(index + ii*0.1, Eb_v[ii].n, s=40, color=col_ar[ii], lw=0, label=ratio_labels[ii]+' '+spec_labels[ii] if not index else None)
+        ax.errorbar(index + ii*0.1, Eb_v[ii].n, yerr=Eb_v[ii].s, color=col_ar[ii])
+
+fs = 15 # plot label fontsize
+plt.legend(loc='lower left', fontsize=fs)
+ax.set_xticks(np.arange(len(filenames)))
+ax.set_xticklabels(filenames, rotation=50, fontsize=fs, ha='right', va='top')
+plt.ylim(-0.6,0.8)
+plt.ylabel('E(B-V)', fontsize=fs)
+plt.xlabel('Rolls', fontsize=fs)
+plt.show(block=False)
+fig.savefig(os.path.splitext(fout)[0]+'.eps')
 
 edf.to_latex(fout, index=None, escape=False)
 for i in range(len(filenames)): u.insert_line_in_file('\hline\n\multicolumn{4}{c}{'+filenames[i]+'} \\\ \n\hline \n', 4 + i*(3+len(ratio_labels)), fout)
