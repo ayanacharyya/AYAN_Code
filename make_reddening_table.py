@@ -1,4 +1,5 @@
-#python routine to compute reddening using several Balmer lines for S1723 grism spectra
+# python routine to compute reddening using several Balmer lines for S1723 grism spectra
+# just to find out which extinction measurements are reliable and the mean E(B-V) that should be used for S1723
 # by Ayan, Sep 2017
 
 import numpy as np
@@ -14,8 +15,22 @@ sys.path.append('../')
 import ayan.mage as m
 import ayan.splot_util as u
 import calc_reddening as cr
+from uncertainties import ufloat
 import subprocess
 
+# ------------function to get weighted average in pandas groups----------
+def wavg(group, avg_name, uncert_name):
+    """ http://stackoverflow.com/questions/10951341/pandas-dataframe-aggregate-function-using-multiple-columns
+    In rare instance, we may not have weights, so just return the mean. Customize this if your business case
+    should return otherwise.
+    """
+    d = group[avg_name]
+    u = group[uncert_name]
+    try:
+        return ufloat((d / u**2).sum() / (1./u**2).sum(), np.sqrt(1./(1./u**2).sum()))
+    except ZeroDivisionError:
+        return ufloat(d.mean(), 0.)
+# ----------------------------------------------------------------------
 
 input_path = HOME + '/Dropbox/Grism_S1723/WFC3_fit_1Dspec/1Dsum/'
 fout = HOME + '/Dropbox/Grism_S1723/Latex/Tabs/s1723_red_table.tex'
@@ -36,6 +51,7 @@ g141_hlist = ['Halpha', 'Hbeta']
 plt.close('all')
 fig, ax = plt.subplots()
 fig.subplots_adjust(hspace=0.1, wspace=0.03, top=0.97, bottom=0.2, left=0.1, right=0.98)
+col_ar = ['r', 'g', 'b', 'orange']
 
 for (index,item) in enumerate(filenames): # for each roll
     wfc_g102_file = input_path + 'sgas1723_1Dsum_'+item+'_G102_wcontMWdr_meth2.fitdf'
@@ -55,19 +71,25 @@ for (index,item) in enumerate(filenames): # for each roll
                  H_g102[0] / H_g102[2]]  # , H_g102[0]/H_g102[3], H_g102[0]/(H_esi[0]*esi_to_mmt_scale), H_esi[0]/H_esi[1]]
     Eb_v = (2.5 / delta_k) * unp.log10(ratio_obs / ratio_theoretical)
     print '\nMean E(B-V) =', np.mean(Eb_v)
-    edf = pd.concat([edf, pd.DataFrame(np.transpose(np.vstack([ratio_labels, spec_labels, ['%.2F' % x.n for x in Eb_v], ['%.2F' % x.s for x in Eb_v], ['%.2F' % x.n for x in ratio_obs], ['%.2F' % x.s for x in ratio_obs]])),
+    edf = pd.concat([edf, pd.DataFrame(np.transpose(np.vstack([ratio_labels, spec_labels, ['%.3F' % x.n for x in Eb_v], ['%.2F' % x.s for x in Eb_v], ['%.2F' % x.n for x in ratio_obs], ['%.2F' % x.s for x in ratio_obs]])),
         columns=['Line ratio', 'Grism(s)', 'E(B-V)', r'E(B-V)$_u$', 'Observed ratio', 'Observed ratio uncert'])])
     # ------to plot the E(B-V) values for visual comparison-----
-    col_ar = ['r', 'g', 'b', 'orange']
     for ii in range(len(Eb_v)):
         ax.scatter(index + ii*0.1, Eb_v[ii].n, s=40, color=col_ar[ii], lw=0, label=ratio_labels[ii]+' '+spec_labels[ii] if not index else None)
         ax.errorbar(index + ii*0.1, Eb_v[ii].n, yerr=Eb_v[ii].s, color=col_ar[ii])
+
+# --------to plot weighted means of each extinction---------------
+for column in edf.columns[2:]: edf[column] = edf[column].astype(np.float64)
+wavg_arr = edf.groupby(['Line ratio', 'Grism(s)'], sort=False).apply(wavg, 'E(B-V)', 'E(B-V)$_u$').values
+for (ii,mean) in enumerate(wavg_arr):
+    plt.axhline(mean.n, color=col_ar[ii], ls='dashed', label='Weighted means' if not ii else None)
+print wavg_arr
 
 fs = 15 # plot label fontsize
 plt.legend(loc='lower left', fontsize=fs)
 ax.set_xticks(np.arange(len(filenames)))
 ax.set_xticklabels(filenames, rotation=50, fontsize=fs, ha='right', va='top')
-plt.ylim(-0.6,0.8)
+plt.ylim(-0.7,0.8)
 plt.ylabel('E(B-V)', fontsize=fs)
 plt.xlabel('Rolls', fontsize=fs)
 plt.show(block=False)

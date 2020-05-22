@@ -1,4 +1,5 @@
 # python routine to compute E(B-V) using several Balmer lines for S1723
+# and then scale the dereddened fluxes across different spectrographs to create a master linelist
 # by Ayan, Sep 2017
 
 import numpy as np
@@ -15,6 +16,7 @@ import ayan.splot_util as u
 import subprocess
 import jrr as jrr
 import re
+import dftolatex as d2l
 
 
 # ------------------------------------------------------
@@ -54,12 +56,16 @@ def scale_df(df, scale_factor, columns_to_scale=['integrated_flux', 'uncert_flux
 
 # ------------------------------------------------------
 def format_df(df, columns_to_scale=['integrated_flux', 'uncert_flux', 'dered_flux', 'uncert_dered_flux']):
+    to_replace = [('<', r'$<$'), ('>', r'$>$'), ('nan', '..'), ('Ly-alpha', r'Ly$\\alpha$')]  # [(replace_this, with_this),..]
+    to_replace = np.array(to_replace)
+    df2 = df.replace(to_replace[:, 0].tolist(), to_replace[:, 1].tolist(), regex=True)
     for column in columns_to_scale:
-        if column in df:
-            df[column] = df[column].map('{:.3f}'.format)
+        if column in df2:
+            try: df2[column] = df2[column].map('{:.3f}'.format)
+            except: pass
         else:
             continue
-    return df
+    return df2
 
 
 # ------------------------------------------------------
@@ -86,7 +92,7 @@ def deredden(filename, E, E_u, niter=int(1e5), constant=1e-17, dered=True, chang
             df['SNR'] = df['uncert_flux'] / df['integrated_flux']
             print 'After changing uncertainties for\n', df[concerned]
         df.drop('SNR', axis=1, inplace=True)
-        filename = filename[:-4] + '_umod.txt'
+        filename = os.path.splitext(filename)[0] + '_umod.txt'
         header += '\
     "uncert_flux" has been modified as follows:\n\
     If any line had a "integrated_flux"/"uncert_flux" < ' + str(
@@ -100,7 +106,7 @@ def deredden(filename, E, E_u, niter=int(1e5), constant=1e-17, dered=True, chang
                       6725.000:'SII6717;SII6731'}
 
         df['ID'] = df['rest_wave'].apply(lambda x: label_dict[float('%.3F'%x)])
-        filename = filename[:-4] + '_lmod.txt'
+        filename = os.path.splitext(filename)[0] + '_lmod.txt'
         header += '\
     "ID" has been modified as follows:\n\
     Line labels have been changed to match a generalised format.\n\
@@ -121,7 +127,7 @@ def deredden(filename, E, E_u, niter=int(1e5), constant=1e-17, dered=True, chang
         df['dered_flux'] /= constant
         df['uncert_dered_flux'] /= constant
 
-        filename = filename[:-4] + '_dered.txt'
+        filename = os.path.splitext(filename)[0] + '_dered.txt'
         header += '\
     dered_flux:    dereddened flux with E(B-V) = ' + str(E) + ' +/- ' + str(E_u) + ' (units of ' + str(constant) + ' erg/s/cm^2)\n\
     uncert_dered_flux:    error in above qty. (units of ' + str(constant) + ' erg/s/cm^2)\n\
@@ -137,12 +143,16 @@ def deredden(filename, E, E_u, niter=int(1e5), constant=1e-17, dered=True, chang
     for i in range(len(df)):
         if df.loc[i]['uncert_flux'] == '%.2F' % (-99.):
             df.ix[i, 'integrated_flux'] = '<' + str(
-                df.loc[i]['integrated_flux'])  # to add '<' to fluxes that are upper limits
+                df.loc[i]['integrated_flux'])  # to add '<' to fluxes that hiscolare upper limits
             df.ix[i, 'uncert_flux'] = '-'
             if 'dered_flux' in df:
                 df.ix[i, 'dered_flux'] = '<' + str(
                     df.loc[i]['dered_flux'])  # to add '<' to fluxes that are upper limits
                 df.ix[i, 'uncert_dered_flux'] = '-'
+
+    cols_to_add = ['EWr_fit', 'EWr_fit_u', 'EW_signi'] # these columns to be added as dummy, if they don't already exist
+    for thiscol in cols_to_add:
+        if thiscol not in df.columns: df[thiscol] = '-'
 
     np.savetxt(filename, [], header=header, comments='#')
     df.to_csv(filename, index=None, mode='a', sep='\t')
@@ -155,9 +165,7 @@ def combine_tables(mmt, esi, wfc, esi_to_mmt_scale, esi_to_wfc_scale, master_fil
     print '\nCombining 3 files into one master file...'
     esi = scale_df(esi, 1./esi_to_wfc_scale)
     mmt = scale_df(mmt, esi_to_mmt_scale/esi_to_wfc_scale)
-    master = pd.concat([mmt, esi, wfc], ignore_index=True).sort_values('uncert_flux').drop_duplicates(subset='ID',
-                                                                                                      keep='first').sort_values(
-        'rest_wave').reset_index(drop=True)
+    master = pd.concat([mmt, esi, wfc], ignore_index=True).sort_values('uncert_flux').sort_values('rest_wave').reset_index(drop=True)
     specdict = {'MMT': 0, 'ESI': 1, 'WFC3,~G102': 2, 'WFC3,~G141': 3,
                 'GEMINI/GNIRS': 4}  # what order of spectrograph we want the final table in
     master['speclabel'] = master['spectrograph'].map(specdict)
@@ -176,24 +184,24 @@ def combine_tables(mmt, esi, wfc, esi_to_mmt_scale, esi_to_wfc_scale, master_fil
     print '\nWritten master file', master_filename_txt
 
     # -------for modifying txt file for PIZI-----------
-    master_txt.replace(['OII2470', 'SII6717', 'SIII6312'], ['OII2470a;OII2470b', 'SII6717;SII6731', 'OI6300;SIII6312'],
+    master_txt.replace(['OII2470'], ['OII2470a;OII2470b'],
                        regex=True, inplace=True)
     no_PIZI_lines = ['Fe', 'Mg', 'Hzeta+HeI',
                      'OII3727+9']  # lines certainly not to be included for PIZI; OII doublet from WFC isn't icncluded bcz we have them resolved & measured from ESI
     for l in no_PIZI_lines: master_txt['ID'] = master_txt['ID'].str.replace(re.sub('\+', '\+', l), '#' + l)
-    np.savetxt(master_filename_txt[:-4] + '_forPIZI.txt', [], header=header, comments='#')
-    master_txt.to_csv(master_filename_txt[:-4] + '_forPIZI.txt', index=None, sep='\t', mode='a')
-    print '\nWritten master file', master_filename_txt[:-4] + '_forPIZI.txt'
-    print 'PIZI\n', master_txt  #
+    pizi_filename = os.path.splitext(master_filename_txt.replace('txt_tables' ,'PIZI_tables'))[0] + '_forPIZI.txt'
+    np.savetxt(pizi_filename, [], header=header, comments='#')
+    master_txt.to_csv(pizi_filename, index=None, sep='\t', mode='a')
+    print '\nWritten master file', pizi_filename
 
     # -------for writing tex file-----------
-    master.replace(['Halpha', 'Hbeta', 'Hgamma', 'Hdelta', 'Hepsilon', 'Hzeta', 'Heta'], \
-                   [r'H$\alpha$', r'H$\beta$', r'H$\gamma$', r'H$\delta$', r'H$\epsilon$', r'H$\zeta$', r'H$\eta$'],
+    master.replace(['Halpha', 'Hbeta', 'Hgamma', 'Hdelta', 'Hepsilon', 'Hzeta', 'Heta', 'Hzeta+HeI'], \
+                   [r'H$\alpha$', r'H$\beta$', r'H$\gamma$', r'H$\delta$', r'H$\epsilon$', r'H$\zeta$', r'H$\eta$', r'H$\zeta$;HeI'],
                    inplace=True)  # replacing names of Balmer lines
-    try:
-        master = format_df(master)
-    except:
-        pass
+    master = format_df(master)
+    master.drop(['Notes'], axis=1, inplace=True)
+    column_order = ['ID', 'rest_wave', 'spectrograph', 'EWr_fit', 'EWr_fit_u', 'EW_signi', 'integrated_flux', 'uncert_flux', 'dered_flux', 'uncert_dered_flux']
+    master = master[column_order]
 
     master.replace(float('%.4F' % 3728.5), '3727+3729',
                    inplace=True)  # replacing back doublet rest wavelength after dereddening
@@ -202,103 +210,88 @@ def combine_tables(mmt, esi, wfc, esi_to_mmt_scale, esi_to_wfc_scale, master_fil
     master.replace(float('%.4F' % 6307.5), '6302,6313',
                    inplace=True)  # replacing back doublet rest wavelength after dereddening
 
-    master.rename(columns={'ID': 'Line ID', 'rest_wave': '$\lambda_{\mathrm{rest}}$ (\AA)', 'integrated_flux': 'flux', \
-                           'uncert_flux': '$\delta$ flux', 'dered_flux': 'dereddened flux',
-                           'uncert_dered_flux': '$\delta$ dereddened flux'}, inplace=True)
+    master.rename(columns={'ID':'Line ID', 'rest_wave':r'$\lambda_{\mathrm{rest}}$', 'EWr_fit':r'W$_{\mathrm{r,fit}}$', 'EWr_fit_u':r'$\Delta$ W$_{\mathrm{r,fit}}$', \
+     'EW_signi':r'W$_{\mathrm{r,signi}}$', 'integrated_flux':r'flux', 'uncert_flux':r'$\Delta$ flux', \
+     'dered_flux':r'flux$_{\mathrm{deredenned}}$', 'uncert_dered_flux':r'$\Delta$ flux$_{\mathrm{deredenned}}$'}, inplace=True)
+
     # master.columns = master.columns.str.replace('_','\_')
+    master['Line ID'] = master['Line ID'].apply(lambda x: d2l.format_forbidden(x))  # to format line labels with space and brackets
+
     master.to_latex(master_filename_tex, index=None, escape=False)
     with open(master_filename_tex, 'a') as f:
-        f.write(r'\caption{Measured flux values ($flux_{\mathrm{integrated}}$) and corresponding uncertainties ($\Delta flux_{\mathrm{integrated}}$) for nebular emission lines \
-in the re-scaled S1723 spectra. The "spectrograph" column denotes which instrument the concerned line was detected with. \
-We quote the flux values after accounting for the intrinsic reddening in $flux_{\mathrm{dereddened}}$ and $\Delta flux_{\mathrm{dereddened}}$ respectively. \
+        f.write(r'\caption{Measured flux values and corresponding uncertainties ($\Delta$ flux) for nebular emission lines \
+in the re-scaled S1723 spectra. Each emission line is labeled with "Line ID" and its rest-frame wavelength is indicated as $\lambda_{\mathrm{rest}}$. \
+The "spectrograph" column denotes which instrument the concerned line was detected with. \
+W$_{\mathrm{r,fit}}$ denotes the fitted, rest-frame equivalent width. The corresponding uncertainty and signifcance (see Section XYZ) are quoted as $\Delta$ W$_{\mathrm{r,fit}}$ and W$_{\mathrm{r,signi}}$ respectively.\
+We also quote the flux values after accounting for the intrinsic reddening and the corresponsing uncertainty as $flux_{\mathrm{dereddened}}$ and $\Delta flux_{\mathrm{dereddened}}$ respectively. \
 All the flux and corresponding uncertainties are in 10$^{-17}$ ergs/s/$\mathrm{cm^2}$ units.}')
     u.insert_line_in_file('\scriptsize\n', 0, master_filename_tex)
+    
     print 'Written master file', master_filename_tex, '\n'
+    print 'tex file\n', master  #
 
     return master_txt
 
 
 # ------------------------------------------------------
-labels = np.array(['Halpha', 'Hbeta', 'Hgamma', 'Hdelta', 'Hepsilon', 'Hzeta', 'Heta'])
-wave = np.array([6564.61, 4862.683, 4341.684, 4102.892, 3971.195, 3890.158,
-                 3836.479])  # rest-frame vaccuum wavelengths of Balemr lines
-k = m.getfullkappa(wave)
-ratio_labels = [r'H$\alpha$/H$\beta$', r'H$\alpha$/H$\beta$', r'H$\beta$/H$\gamma$',
-                r'H$\beta$/H$\delta$']  # , r'H$\beta$/H$\epsilon$', r'H$\beta$/H$\zeta$', r'H$\zeta$/H$\epsilon$']
-spec_labels = ['G141', 'G141/G102', 'G102', 'G102']  # , 'G102', 'G102/ESI', 'ESI']
-delta_k = np.array([k[1] - k[0], k[1] - k[0], -k[1] + k[2], -k[1] + k[3]])  # , -k[1]+k[4], -k[1]+k[5], -k[5]+k[6]])
-ratio_theoretical = np.array([2.8785 / 1, 2.8785 / 1, 1 / 0.46756,
-                              1 / .25825])  # , 1/.15856, 1/0.10472, 0.10472/.072916]) #from /Users/acharyya/Desktop/Lisa_UV_diag/P_spherical/spherical/sp_P60_a05modelfiles/Q800/spec0003.csv
-# MAPPINGS V model for lpok=6, logq=8, Z=8.23
-# ------------------------------------------------------
-mmt_file = HOME + '/Dropbox/mage_atlas/Contrib/EWs/emission/s1723_MMT_emission_measured.txt'
-subprocess.call(['python dftolatex.py --short s1723_MMT_wcont_new-format --infile '+mmt_file+' --EW_thresh 3 --SNR_thresh 0 --const 1e-17 --nopizi --notex'], shell=True)
-mmt_file = os.path.dirname(mmt_file)+'/txt_files/' + os.path.splitext(os.path.basename(mmt_file))[0]+'_detected.txt'
+if __name__ == '__main__':
+    labels = np.array(['Halpha', 'Hbeta', 'Hgamma', 'Hdelta', 'Hepsilon', 'Hzeta', 'Heta'])
+    wave = np.array([6564.61, 4862.683, 4341.684, 4102.892, 3971.195, 3890.158,
+                     3836.479])  # rest-frame vaccuum wavelengths of Balemr lines
+    k = m.getfullkappa(wave)
+    ratio_labels = [r'H$\alpha$/H$\beta$', r'H$\alpha$/H$\beta$', r'H$\beta$/H$\gamma$',
+                    r'H$\beta$/H$\delta$']  # , r'H$\beta$/H$\epsilon$', r'H$\beta$/H$\zeta$', r'H$\zeta$/H$\epsilon$']
+    spec_labels = ['G141', 'G141/G102', 'G102', 'G102']  # , 'G102', 'G102/ESI', 'ESI']
+    delta_k = np.array([k[1] - k[0], k[1] - k[0], -k[1] + k[2], -k[1] + k[3]])  # , -k[1]+k[4], -k[1]+k[5], -k[5]+k[6]])
+    ratio_theoretical = np.array([2.8785 / 1, 2.8785 / 1, 1 / 0.46756,
+                                  1 / .25825])  # , 1/.15856, 1/0.10472, 0.10472/.072916]) #from /Users/acharyya/Desktop/Lisa_UV_diag/P_spherical/spherical/sp_P60_a05modelfiles/Q800/spec0003.csv
+    # MAPPINGS V model for lpok=6, logq=8, Z=8.23
+    # ------------------------------------------------------
+    txt_table_path = '/Dropbox/Mage_atlas/Contrib/EWs/emission/txt_tables/'
 
-esi_file = HOME + '/Dropbox/mage_atlas/Contrib/EWs/emission/s1723_ESI_emission_measured.txt'
-subprocess.call(['python dftolatex.py --short s1723_ESI_wcont_new-format --infile '+esi_file+' --EW_thresh 3 --SNR_thresh 0 --const 1e-17 --nopizi --notex'], shell=True)
-esi_file = os.path.dirname(esi_file)+'/txt_files/' + os.path.splitext(os.path.basename(esi_file))[0]+'_detected.txt'
+    mmt_file = HOME + txt_table_path + 's1723_MMT_emission_measured.txt'
+    subprocess.call(['python dftolatex.py --short s1723_MMT_wcont_new-format --infile '+mmt_file+' --outpath '+'/'.join(os.path.split(mmt_file)[0].split('/')[:-1])+'/'+' --EW_thresh 3 --SNR_thresh 0 --const 1e-17 --nopizi --notex'], shell=True)
+    mmt_file = os.path.splitext(mmt_file)[0]+'_detected.txt'
 
-wfc_g102_file = HOME + '/Dropbox/Grism_S1723/WFC3_fit_1Dspec/1Dsum/sgas1723_1Dsum_bothroll_G102_wcontMWdr_meth2.fitdf'
-wfc_g102_file = deredden(wfc_g102_file, 0.3, 0.02, niter=int(1e5), constant=1e-17, dered=True, change_ID=True, change_errors=True,
-                    SNR_thresh=0.014, readcsv=True)  # to deredden WFC3 spectra and re-write the file
+    esi_file = HOME + txt_table_path + 's1723_ESI_emission_measured.txt'
+    subprocess.call(['python dftolatex.py --short s1723_ESI_wcont_new-format --infile '+esi_file+' --outpath '+'/'.join(os.path.split(esi_file)[0].split('/')[:-1])+'/'+' --EW_thresh 3 --SNR_thresh 0 --const 1e-17 --nopizi --notex'], shell=True)
+    esi_file = os.path.splitext(esi_file)[0]+'_detected.txt'
 
-wfc_g141_file = HOME + '/Dropbox/Grism_S1723/WFC3_fit_1Dspec/1Dsum/sgas1723_1Dsum_bothroll_G141_wcontMWdr_meth2.fitdf'
-wfc_g141_file = deredden(wfc_g141_file, 0.3, 0.02, niter=int(1e5), constant=1e-17, dered=True, change_ID=True, change_errors=True,
-                    SNR_thresh=0.014, readcsv=True)  # to deredden WFC3 spectra and re-write the file
+    wfc_g102_file = HOME + '/Dropbox/Grism_S1723/WFC3_fit_1Dspec/1Dsum/sgas1723_1Dsum_bothroll_G102_wcontMWdr_meth2.fitdf'
+    wfc_g102_file = deredden(wfc_g102_file, 0.028, 0.04, niter=int(1e5), constant=1e-17, dered=True, change_ID=True, change_errors=True,
+                        SNR_thresh=0.014, readcsv=True)  # to deredden WFC3 spectra and re-write the file
+    # E and E_u are value Ha/Hb from G102/G141 new reduction of bothrolls, computed by AYAN_Code/make_reddening_table.py
 
-mmt = pd.read_table(mmt_file, delim_whitespace=True, comment='#')
-esi = pd.read_table(esi_file, delim_whitespace=True, comment='#')
-'''
-wfc = pd.read_table(wfc_file, delim_whitespace=True, comment='#')
-g102 = wfc[wfc['spectrograph'].str.contains('G102')]
-g141 = wfc[wfc['spectrograph'].str.contains('G141')]
-'''
-g102 = pd.read_table(wfc_g102_file, delim_whitespace=True, comment='#')
-g141 = pd.read_table(wfc_g141_file, delim_whitespace=True, comment='#')
-wfc = pd.concat([g102,g141])
-# ------------------------------------------------------
-esi_hlist = ['Heta']
-g102_hlist = ['Hbeta', 'Hgamma', 'Hdelta', 'Hepsilon']
-g141_hlist = ['Halpha', 'Hbeta']
-c3list = ['CIII1906', 'CIII1908']
-esi_o2list = ['OII3727', 'OII3729']
-g102_o2list = ['OII3727', 'OII3729']  # ['[O~II]']
-# ---------------scaling---------------------------------------
-C3_mmt = unp.uarray(getf(mmt, c3list), gete(mmt, c3list))
-C3_esi = unp.uarray(getf(esi, c3list), gete(esi, c3list))
-O2_esi = unp.uarray(getf(esi, esi_o2list), gete(esi, esi_o2list))
-O2_g102 = unp.uarray(getf(g102, g102_o2list), gete(g102, g102_o2list))
+    wfc_g141_file = HOME + '/Dropbox/Grism_S1723/WFC3_fit_1Dspec/1Dsum/sgas1723_1Dsum_bothroll_G141_wcontMWdr_meth2.fitdf'
+    wfc_g141_file = deredden(wfc_g141_file, 0.028, 0.04, niter=int(1e5), constant=1e-17, dered=True, change_ID=True, change_errors=True,
+                        SNR_thresh=0.014, readcsv=True)  # to deredden WFC3 spectra and re-write the file
 
-mmt_CIII, esi_CIII = np.sum(C3_mmt), np.sum(C3_esi)
-wfc_OII, esi_OII = np.sum(O2_g102), np.sum(O2_esi)
-esi_to_mmt_scale = esi_CIII / mmt_CIII
-esi_to_wfc_scale = esi_OII / wfc_OII
+    mmt = pd.read_table(mmt_file, delim_whitespace=True, comment='#')
+    esi = pd.read_table(esi_file, delim_whitespace=True, comment='#')
+    g102 = pd.read_table(wfc_g102_file, delim_whitespace=True, comment='#')
+    g141 = pd.read_table(wfc_g141_file, delim_whitespace=True, comment='#')
+    wfc = pd.concat([g102,g141])
+    # ------------------------------------------------------
+    esi_hlist = ['Heta']
+    c3list = ['CIII1906', 'CIII1908']
+    esi_o2list = ['OII3727', 'OII3729']
+    g102_o2list = ['OII3727', 'OII3729']  # ['[O~II]']
+    # ---------------scaling---------------------------------------
+    C3_mmt = unp.uarray(getf(mmt, c3list), gete(mmt, c3list))
+    C3_esi = unp.uarray(getf(esi, c3list), gete(esi, c3list))
+    O2_esi = unp.uarray(getf(esi, esi_o2list), gete(esi, esi_o2list))
+    O2_g102 = unp.uarray(getf(g102, g102_o2list), gete(g102, g102_o2list))
 
-print '\nCIII1907-9 ESI/MMT ratio =', esi_to_mmt_scale
-print 'OII3727-9 ESI/WFC ratio =', esi_to_wfc_scale
-# ---------------reddening---------------------------------------
-H_esi = unp.uarray(getf(esi, esi_hlist), gete(esi, esi_hlist))
-H_g102 = unp.uarray(getf(g102, g102_hlist), gete(g102, g102_hlist))
-H_g141 = unp.uarray(getf(g141, g141_hlist), gete(g141, g141_hlist))
+    mmt_CIII, esi_CIII = np.sum(C3_mmt), np.sum(C3_esi)
+    wfc_OII, esi_OII = np.sum(O2_g102), np.sum(O2_esi)
+    esi_to_mmt_scale = esi_CIII / mmt_CIII
+    esi_to_wfc_scale = esi_OII / wfc_OII
 
-ratio_obs = [H_g141[0] / H_g141[1], H_g141[0] / H_g102[0], H_g102[0] / H_g102[1],
-             H_g102[0] / H_g102[2]]  # , H_g102[0]/H_g102[3], H_g102[0]/(H_esi[0]*esi_to_mmt_scale), H_esi[0]/H_esi[1]]
-Eb_v = (2.5 / delta_k) * unp.log10(ratio_obs / ratio_theoretical)
-print '\nMean E(B-V) =', np.mean(Eb_v)
-edf = pd.DataFrame(
-    np.transpose(np.vstack([ratio_labels, spec_labels, ['%.2F' % x.n for x in Eb_v], ['%.2F' % x.s for x in Eb_v]])),
-    columns=['Lines', 'Spectrograph', 'E(B-V)', 'E(B-V)_u'])
-fout = HOME + '/Dropbox/Grism_S1723/Latex/Tabs/s1723_red_table.tex'
-edf.to_latex(fout, index=None, escape=False)
-with open(fout, 'a') as f:
-    f.write(r'\caption{E(B-V) measurements using different Balmer line pairs (column "Lines"). The spectrographs corresponding to \
-the line pairs are listed in "Spectrograph". The reddening values and corresponding uncertainties are quoted in the "E(B-V)"\
-and "E(B-V)\_u" columns respectively.}')
-
-print '\nList of E(B-V) values\n', edf
-print 'Written file', fout
-# ------------------------------------------------------
-master = combine_tables(mmt, esi, wfc, esi_to_mmt_scale.n, esi_to_wfc_scale.n,
-                        HOME + '/Dropbox/Mage_atlas/Contrib/EWs/emission/s1723_measured_emission_all.txt',
-                        HOME + '/Dropbox/Grism_S1723/Latex/Tabs/s1723_measured_emission_all.tex')  # to combine all 3 files into one master file, by scaling fluxes at OII3727-9 and CIII1907-9
+    print '\nCIII1907-9 ESI/MMT ratio =', esi_to_mmt_scale
+    print 'OII3727-9 ESI/WFC ratio =', esi_to_wfc_scale
+    # ---------------reddening---------------------------------------
+    H_esi = unp.uarray(getf(esi, esi_hlist), gete(esi, esi_hlist))
+    # ------------------------------------------------------
+    master = combine_tables(mmt, esi, wfc, esi_to_mmt_scale.n, esi_to_wfc_scale.n,
+                            HOME + txt_table_path + 's1723_measured_emission_all.txt',
+                            HOME + '/Dropbox/Grism_S1723/Latex/Tabs/s1723_measured_emission_all.tex')  # to combine all 3 files into one master file, by scaling fluxes at OII3727-9 and CIII1907-9
